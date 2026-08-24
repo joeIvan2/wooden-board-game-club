@@ -17,6 +17,7 @@ import {
 } from "./xiangqi-rules.mjs";
 import { formatChineseMove, formatCoordinateMove, parseMoveText } from "./xiangqi-notation.mjs";
 import { createLeaderboardController, isLeaderboardLevel } from "../../shared/leaderboard.mjs";
+import { renderCommittedTerminalMove } from "./terminal-render.mjs";
 
 const LEVEL_NAMES = [
   "初學", "入門", "業餘", "進階", "好手",
@@ -425,7 +426,14 @@ function commitMove(move) {
 
   const status = safeStatus();
   if (terminal(status)) {
-    finishGame(status);
+    renderCommittedTerminalMove({
+      renderBoard,
+      renderMoveList,
+      renderCaptured,
+      finishGame,
+      renderSidebar,
+      updateControls,
+    }, status);
     return;
   }
   const checkNote = status.inCheck ? "，將軍！" : "";

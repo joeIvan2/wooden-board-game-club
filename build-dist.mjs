@@ -36,7 +36,8 @@ const assets = [
   "games/xiangqi/xiangqi-rules.mjs",
   "games/xiangqi/xiangqi-ai.mjs",
   "games/xiangqi/xiangqi-ai-worker.mjs",
-  "games/xiangqi/xiangqi-notation.mjs"
+  "games/xiangqi/xiangqi-notation.mjs",
+  "games/xiangqi/terminal-render.mjs"
 ];
 
 await rm(DIST, { recursive: true, force: true });

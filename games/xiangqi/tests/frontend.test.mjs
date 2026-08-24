@@ -29,6 +29,7 @@ const JS_FILES = [
   "xiangqi-rules.mjs",
   "xiangqi-ai.mjs",
   "xiangqi-notation.mjs",
+  "terminal-render.mjs",
   "xiangqi-ai-worker.mjs",
   "cli/xiangqi-cli.mjs",
   "tests/helpers.mjs",

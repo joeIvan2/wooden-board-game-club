@@ -11,6 +11,7 @@ const SUITES = [
   "rules-special.test.mjs",
   "endgame.test.mjs",
   "ai.test.mjs",
+  "terminal-render.test.mjs",
   "cli.test.mjs",
   "frontend.test.mjs",
 ];
