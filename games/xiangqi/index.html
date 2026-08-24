@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="原木棋社中國象棋：楚河漢界、L1–L10 AI、中文棋譜與本機雙人對戰。" />
+  <title>中國象棋 · 原木棋社</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23241209'/%3E%3Ctext x='16' y='23' font-size='18' text-anchor='middle' fill='%23e8542f' font-family='serif'%3E象%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./css/style.css" />
+  <link rel="stylesheet" href="../../styles/platform.css" />
+</head>
+<body class="platform-page game-page game-xiangqi" data-game="xiangqi">
+  <a class="skip-link" href="#board">跳至棋盤</a>
+
+  <game-platform-nav></game-platform-nav>
+
+  <header class="site-header">
+    <span class="brand-seal" aria-hidden="true">帥</span>
+    <div class="brand-text">
+      <h1>中國象棋</h1>
+      <p class="tagline">原木棋社 · 楚河漢界 · L1–L10</p>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- ============================ 棋盤區 ============================ -->
+    <section class="board-zone" aria-label="棋盤區">
+      <div class="board-shell">
+        <svg id="grid-lines" class="grid-lines" viewBox="0 0 90 100" preserveAspectRatio="none"
+             width="450" height="500"
+             aria-hidden="true" focusable="false">
+          <g class="grid-strokes">
+            <!-- 外框 -->
+            <rect x="1.5" y="1.5" width="87" height="97" rx="2.5" class="line-bold" />
+            <rect x="5" y="5" width="80" height="90" class="line-thin" />
+            <!-- 橫線 -->
+            <line x1="5" y1="5" x2="85" y2="5" />
+            <line x1="5" y1="15" x2="85" y2="15" />
+            <line x1="5" y1="25" x2="85" y2="25" />
+            <line x1="5" y1="35" x2="85" y2="35" />
+            <line x1="5" y1="45" x2="85" y2="45" />
+            <line x1="5" y1="55" x2="85" y2="55" />
+            <line x1="5" y1="65" x2="85" y2="65" />
+            <line x1="5" y1="75" x2="85" y2="75" />
+            <line x1="5" y1="85" x2="85" y2="85" />
+            <line x1="5" y1="95" x2="85" y2="95" />
+            <!-- 直線（河界中斷） -->
+            <line x1="5" y1="5" x2="5" y2="95" />
+            <line x1="85" y1="5" x2="85" y2="95" />
+            <line x1="15" y1="5" x2="15" y2="45" />
+            <line x1="15" y1="55" x2="15" y2="95" />
+            <line x1="25" y1="5" x2="25" y2="45" />
+            <line x1="25" y1="55" x2="25" y2="95" />
+            <line x1="35" y1="5" x2="35" y2="45" />
+            <line x1="35" y1="55" x2="35" y2="95" />
+            <line x1="45" y1="5" x2="45" y2="45" />
+            <line x1="45" y1="55" x2="45" y2="95" />
+            <line x1="55" y1="5" x2="55" y2="45" />
+            <line x1="55" y1="55" x2="55" y2="95" />
+            <line x1="65" y1="5" x2="65" y2="45" />
+            <line x1="65" y1="55" x2="65" y2="95" />
+            <line x1="75" y1="5" x2="75" y2="45" />
+            <line x1="75" y1="55" x2="75" y2="95" />
+            <!-- 九宮（士位）斜線 -->
+            <line x1="35" y1="5" x2="55" y2="25" />
+            <line x1="55" y1="5" x2="35" y2="25" />
+            <line x1="35" y1="75" x2="55" y2="95" />
+            <line x1="55" y1="75" x2="35" y2="95" />
+          </g>
+          <g class="river-text">
+            <text x="22.5" y="52.8" text-anchor="middle">楚　河</text>
+            <text x="67.5" y="52.8" text-anchor="middle">漢　界</text>
+          </g>
+        </svg>
+        <div id="board" role="grid"></div>
+        <div id="result-panel" class="result-panel" role="dialog" aria-modal="false"
+             aria-labelledby="result-title" aria-describedby="result-copy" hidden>
+          <p class="result-stamp" aria-hidden="true">終局</p>
+          <h2 id="result-title"></h2>
+          <p id="result-copy"></p>
+          <div class="dialog-actions">
+            <button id="close-result" type="button" class="btn">關閉</button>
+            <button id="play-again" type="button" class="btn btn-primary">再來一局</button>
+          </div>
+        </div>
+      </div>
+      <p id="board-label" class="board-label">紅方視角</p>
+      <noscript><p class="noscript-note">本站需要啟用 JavaScript 才能對弈。</p></noscript>
+    </section>
+
+    <div class="mobile-primary-actions-slot" data-mobile-actions-slot hidden></div>
+
+    <!-- ============================ 側欄 ============================ -->
+    <aside class="panel" aria-label="對局控制與資訊">
+      <section class="card" aria-labelledby="card-play">
+        <h2 id="card-play">對局</h2>
+        <div class="field-row">
+          <div class="field">
+            <label for="mode-select">模式</label>
+            <select id="mode-select">
+              <option value="ai">人機對弈（我執紅）</option>
+              <option value="local">雙人對戰</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="level-select">AI 等級</label>
+            <select id="level-select"></select>
+          </div>
+        </div>
+        <div class="turn-line">
+          <span id="turn-indicator" class="turn-badge" data-side="red">紅方行棋</span>
+          <span id="move-count" class="move-count">0 半回合</span>
+        </div>
+        <p id="game-status" class="game-status">新局開始，紅方先行。</p>
+        <p id="sr-live" class="visually-hidden" role="status" aria-live="polite"></p>
+        <div class="actions" role="group" aria-label="對局操作" data-mobile-primary-actions>
+          <button id="new-game" type="button" class="btn btn-primary">新局</button>
+          <button id="undo-move" type="button" class="btn">悔棋</button>
+          <button id="hint-move" type="button" class="btn">提示</button>
+          <button id="flip-board" type="button" class="btn">翻面</button>
+        </div>
+      </section>
+
+      <section class="card victory-registration" id="record-panel" aria-labelledby="record-heading" hidden>
+        <h2 id="record-heading">勝局登記</h2>
+        <p class="record-kicker" id="record-summary">擊敗 L6–L10 AI 後可登記排行榜。</p>
+        <div class="record-form" id="record-form">
+          <label for="record-name">排行榜暱稱</label>
+          <input id="record-name" type="text" maxlength="24" autocomplete="nickname" spellcheck="false" />
+          <div class="record-actions">
+            <button id="record-submit" type="button" class="btn btn-primary">登記勝局</button>
+            <button id="record-skip" type="button" class="btn">略過</button>
+          </div>
+        </div>
+        <p class="record-status" id="record-status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="card" aria-labelledby="card-record">
+        <h2 id="card-record">棋譜</h2>
+        <div id="move-list" class="move-list" role="list" tabindex="0" aria-label="著法記錄，可上下捲動"></div>
+        <div class="actions" role="group" aria-label="棋譜操作">
+          <button id="download-record" type="button" class="btn">下載棋譜</button>
+          <button id="save-game" type="button" class="btn">存檔</button>
+          <button id="load-game" type="button" class="btn">讀檔</button>
+        </div>
+        <p class="privacy-note">存檔與棋譜只保存在這台裝置的瀏覽器，不會上傳。</p>
+      </section>
+
+      <section class="card" aria-labelledby="card-captured">
+        <h2 id="card-captured">被吃子力</h2>
+        <p class="cap-label">黑方損失</p>
+        <div id="captured-black" class="captured" aria-label="黑方被吃的棋子"></div>
+        <p class="cap-label">紅方損失</p>
+        <div id="captured-red" class="captured" aria-label="紅方被吃的棋子"></div>
+      </section>
+
+      <section class="card" aria-labelledby="card-library">
+        <h2 id="card-library">私人棋譜庫</h2>
+        <div id="record-list" class="record-list" aria-label="已完成的對局記錄"></div>
+      </section>
+    </aside>
+  </main>
+
+  <section class="leaderboard-section" aria-labelledby="leaderboard-heading">
+    <div class="leaderboard-card">
+      <div class="leaderboard-heading-row">
+        <div>
+          <p class="section-number">RANKING</p>
+          <h2 class="leaderboard-heading" id="leaderboard-heading">中國象棋排行榜</h2>
+        </div>
+        <p class="leaderboard-kicker">玩家執紅擊敗 L6–L10 AI 的規則驗證勝局；可依等級篩選，總步數越少排名越前。</p>
+      </div>
+      <div class="leaderboard-levels" id="leaderboard-levels" role="group" aria-label="篩選 AI 等級"></div>
+      <p class="leaderboard-status" id="leaderboard-status" role="status" aria-live="polite"></p>
+      <div class="leaderboard-table-wrap">
+        <table class="leaderboard-table">
+          <thead><tr><th scope="col">#</th><th scope="col">暱稱</th><th scope="col">AI</th><th scope="col">總步數</th><th scope="col">日期</th></tr></thead>
+          <tbody id="leaderboard-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <p>規則引擎、AI 與 CLI 共用同一套 ES Modules；L6–L10 勝局可登記規則驗證排行榜。</p>
+  </footer>
+
+  <script type="module" src="../../shared/platform-nav.mjs"></script>
+  <script type="module" src="../../shared/mobile-board-actions.mjs"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

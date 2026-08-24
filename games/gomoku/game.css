@@ -1,0 +1,95 @@
+:root { --gomoku-cell: clamp(24px, 2.65vw, 38px); }
+
+.visually-hidden {
+  position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.skip-link { position: fixed; left: 12px; top: -70px; z-index: 100; padding: 10px 16px; border-radius: 8px; color: var(--ink-900); background: var(--brass-200); font-weight: 800; text-decoration: none; }
+.skip-link:focus-visible { top: 12px; }
+
+.gomoku-header {
+  width: min(calc(100% - 32px), 1180px); margin: 0 auto; padding: 28px 8px 14px;
+  display: flex; align-items: center; gap: 16px;
+}
+.game-seal { width: 58px; height: 58px; flex: none; display: grid; place-items: center; border-radius: 14px; color: var(--paper-100); font: 700 31px/1 var(--display-font); background: linear-gradient(145deg, var(--vermilion-400), #8e2918); border: 1px solid rgba(255,241,218,.35); box-shadow: inset 0 1px rgba(255,255,255,.25), 0 10px 24px rgba(0,0,0,.34); }
+.game-kicker { margin: 0 0 3px; color: var(--brass-400) !important; font-size: 10px !important; font-weight: 800; letter-spacing: .22em; }
+.gomoku-header h1 { margin: 0; font: 700 clamp(27px, 4vw, 38px)/1.1 var(--display-font); letter-spacing: .08em; }
+.gomoku-header p { margin: 3px 0 0; color: var(--paper-300); font-size: 13px; }
+
+.gomoku-layout {
+  width: min(calc(100% - 32px), 1180px); margin: 0 auto; padding: 8px 0 48px;
+  display: grid; grid-template-columns: minmax(0, auto) minmax(300px, 360px); align-items: start; justify-content: center; gap: 26px;
+}
+.gomoku-board-zone { min-width: 0; display: grid; justify-items: center; gap: 10px; }
+.gomoku-frame {
+  max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; padding: clamp(12px, 2vw, 22px);
+  border: 1px solid rgba(240,210,143,.22); border-radius: 20px;
+  background: repeating-linear-gradient(91deg, rgba(255,255,255,.025) 0 2px, transparent 2px 9px), linear-gradient(145deg, #51331a, #26170c 82%);
+  box-shadow: 0 24px 60px rgba(0,0,0,.48), inset 0 1px rgba(255,255,255,.1), inset 0 -8px 22px rgba(0,0,0,.34);
+}
+.gomoku-stage {
+  position: relative; isolation: isolate; width: calc(var(--gomoku-cell) * 15); height: calc(var(--gomoku-cell) * 15); flex: none;
+  border-radius: 8px; overflow: hidden;
+  background: radial-gradient(130% 90% at 22% 8%, rgba(255,245,211,.2), transparent 54%), repeating-linear-gradient(92deg, rgba(89,48,17,.08) 0 2px, transparent 2px 9px), linear-gradient(150deg, #d9ad6b, #bb8144);
+  box-shadow: inset 0 0 32px rgba(61,31,9,.32);
+}
+.gomoku-grid { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; pointer-events: none; }
+.gomoku-grid-lines { fill: none; stroke: #8a633a; stroke-width: .5; opacity: .5; vector-effect: non-scaling-stroke; }
+.gomoku-star-points { fill: #4b2a12; }
+.gomoku-board { position: absolute; inset: 0; z-index: 2; display: grid; grid-template-columns: repeat(15, var(--gomoku-cell)); grid-template-rows: repeat(15, var(--gomoku-cell)); touch-action: pan-y pinch-zoom; -webkit-tap-highlight-color: transparent; }
+.gomoku-point { position: relative; z-index: 2; width: var(--gomoku-cell); height: var(--gomoku-cell); min-width: 0 !important; min-height: 0 !important; padding: 0; border: 0; border-radius: 50%; background: transparent; display: grid; place-items: center; cursor: pointer; }
+.gomoku-point:disabled { cursor: default; }
+.gomoku-point:not(:disabled):hover { background: rgba(255,244,215,.18); }
+.gomoku-point:focus-visible { z-index: 4; border-radius: 7px; }
+.gomoku-point.is-touch-preview:not(.has-stone)::after { content: ""; position: absolute; inset: -4px; border: 2px solid rgba(93,61,31,.7); border-radius: 50%; background: rgba(255,244,215,.28); box-shadow: 0 2px 7px rgba(0,0,0,.26); pointer-events: none; }
+.gomoku-stone { width: 78%; aspect-ratio: 1; border-radius: 50%; box-shadow: 0 4px 7px rgba(0,0,0,.42), inset 0 2px 3px rgba(255,255,255,.18); }
+.stone-black .gomoku-stone { background: radial-gradient(circle at 31% 27%, #4f483e, #211c17 52%, #090705); border: 1px solid #070503; }
+.stone-white .gomoku-stone { background: radial-gradient(circle at 31% 25%, #fffdf5, #ebdfc8 58%, #bda783); border: 1px solid #8d724d; }
+.gomoku-point.is-last .gomoku-stone::after { content: ""; position: absolute; width: 24%; aspect-ratio: 1; border-radius: 50%; background: var(--vermilion-400); box-shadow: 0 0 0 2px rgba(255,241,218,.55); }
+.board-view-label { margin: 0; color: rgba(245,234,211,.52); font-size: 12px; letter-spacing: .16em; }
+
+.gomoku-panel { display: grid; gap: 14px; }
+.wood-card { padding: 18px; border: 1px solid rgba(240,210,143,.18); border-radius: 16px; background: repeating-linear-gradient(91deg, rgba(255,255,255,.014) 0 2px, transparent 2px 8px), linear-gradient(150deg, rgba(59,36,19,.9), rgba(31,18,9,.95)); box-shadow: 0 18px 44px rgba(0,0,0,.28), inset 0 1px rgba(255,255,255,.05); }
+.card-heading-row { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 15px; }
+.section-number { margin: 0 0 5px; color: var(--brass-400); font-size: 9px; font-weight: 900; letter-spacing: .2em; }
+.wood-card h2 { margin: 0; font: 700 19px/1.2 var(--display-font); letter-spacing: .12em; }
+.field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field-grid label { color: var(--paper-300); font-size: 12px; font-weight: 700; }
+.field-grid select { width: 100%; margin-top: 6px; padding: 0 12px; border: 1px solid rgba(240,210,143,.22); border-radius: 10px; color: var(--paper-100); background: #241409; }
+.turn-row { margin-top: 14px; padding: 12px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid rgba(240,210,143,.12); border-bottom: 1px solid rgba(240,210,143,.12); color: var(--paper-300); font-size: 13px; }
+.turn-badge { display: inline-flex; align-items: center; gap: 8px; color: var(--paper-100); }
+.turn-badge i { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(255,255,255,.28); }
+.turn-badge[data-player="black"] i { background: #17120d; }
+.turn-badge[data-player="white"] i { background: #f3e7d0; }
+.game-status { min-height: 48px; margin: 12px 0; padding: 11px 12px; border-radius: 10px; color: var(--paper-100); background: rgba(13,7,3,.34); }
+.action-row { display: flex; gap: 9px; }
+.wood-btn { min-width: 88px; padding: 0 17px; border: 1px solid rgba(240,210,143,.18); border-radius: 10px; color: var(--paper-100); background: linear-gradient(#513018, #3a2110); transition: border-color .18s ease, background-color .18s ease; }
+.wood-btn.primary { background: linear-gradient(var(--vermilion-400), #a93420); border-color: rgba(255,220,190,.24); }
+.wood-btn:hover:not(:disabled) { border-color: rgba(240,210,143,.52); }
+.wood-btn:disabled { opacity: .42; cursor: default; }
+.thinking-badge { padding: 6px 9px; border-radius: 999px; color: var(--brass-200); background: rgba(210,170,91,.1); font-size: 11px; }
+.thinking-badge i { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--brass-400); animation: pulse 1s ease-in-out infinite alternate; }
+.gomoku-moves { max-height: 206px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.gomoku-moves li { min-height: 36px; display: grid; grid-template-columns: 34px 1fr 1fr; align-items: center; border-bottom: 1px solid rgba(240,210,143,.09); color: var(--paper-300); font-size: 13px; }
+.gomoku-moves li span { color: rgba(245,234,211,.42); }
+.gomoku-moves .empty-record { display: block; min-height: 0; padding: 9px 0; border: 0; }
+.connection-card { position: relative; }
+.connection-card p { margin: 9px 74px 0 0; color: var(--paper-300); font-size: 13px; }
+.coming-soon { position: absolute; right: 16px; top: 18px; padding: 5px 8px; border: 1px solid rgba(240,210,143,.16); border-radius: 999px; color: var(--paper-300); font-size: 10px; letter-spacing: .08em; }
+.gomoku-footer { width: min(calc(100% - 32px), 1180px); margin: 0 auto; padding: 0 0 34px; color: rgba(245,234,211,.48); font-size: 12px; text-align: center; }
+
+@keyframes pulse { to { opacity: .35; } }
+
+@media (max-width: 1020px) {
+  .gomoku-layout { grid-template-columns: 1fr; }
+  .gomoku-panel { width: min(100%, 620px); justify-self: center; }
+  .gomoku-frame { width: min(100%, calc(var(--gomoku-cell) * 15 + 44px)); }
+}
+@media (max-width: 520px) {
+  :root { --gomoku-cell: min(24px, calc(6.6667vw - 2.267px)); }
+  .gomoku-header { width: calc(100% - 24px); padding-top: 22px; }
+  .gomoku-layout { width: calc(100% - 20px); }
+  .gomoku-frame { padding: 6px; overflow-x: hidden; }
+  .field-grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { .thinking-badge i { animation: none; } }

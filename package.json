@@ -1,0 +1,15 @@
+{
+  "name": "wooden-board-game-club",
+  "version": "1.0.0",
+  "description": "原木棋社：五子棋、西洋棋與中國象棋的統一 2D 平台",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "node build-dist.mjs",
+    "start": "node serve.mjs",
+    "test": "node tests/run-all.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

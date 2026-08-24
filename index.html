@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#1b1009" />
+  <meta name="description" content="原木棋社：五子棋、西洋棋與中國象棋的高質感 2D 本機對弈平台。" />
+  <title>原木棋社 · 三棋一席</title>
+  <link rel="stylesheet" href="./styles/platform.css" />
+</head>
+<body class="platform-page hub-page" data-game="home">
+  <game-platform-nav></game-platform-nav>
+  <main class="hub-main">
+    <section class="hub-hero" aria-labelledby="hub-title">
+      <p class="eyebrow">THREE GAMES · ONE TABLE</p>
+      <h1 class="hub-title" id="hub-title">三棋一席</h1>
+      <p class="hub-lead">五子連珠、西洋攻防、楚河漢界。三套完整規則與 AI 收進同一張原木棋桌，現在專注本機對弈，下一階段再接上真人連線。</p>
+      <div class="hub-meta" aria-label="平台特點">
+        <span class="hub-chip">全 2D 棋盤</span>
+        <span class="hub-chip">L1–L10 AI</span>
+        <span class="hub-chip">鍵盤與觸控</span>
+        <span class="hub-chip">本機優先</span>
+      </div>
+    </section>
+
+    <section class="game-gallery" aria-label="選擇遊戲">
+      <a class="game-card" href="./games/gomoku/">
+        <div class="game-preview" aria-hidden="true">
+          <svg viewBox="0 0 220 176">
+            <rect x="8" y="4" width="204" height="168" rx="12" fill="#4c2f18" stroke="#d2aa5b" stroke-opacity=".45"/>
+            <rect x="22" y="18" width="176" height="140" rx="4" fill="#d8ae72"/>
+            <g stroke="#5a3519" stroke-width="1" opacity=".72">
+              <path d="M32 28v120M48 28v120M64 28v120M80 28v120M96 28v120M112 28v120M128 28v120M144 28v120M160 28v120M176 28v120M192 28v120"/>
+              <path d="M32 28h160M32 40h160M32 52h160M32 64h160M32 76h160M32 88h160M32 100h160M32 112h160M32 124h160M32 136h160M32 148h160"/>
+            </g>
+            <g><circle cx="96" cy="76" r="7" fill="#20150c"/><circle cx="112" cy="88" r="7" fill="#f5ead3" stroke="#70502b"/><circle cx="80" cy="64" r="7" fill="#20150c"/><circle cx="128" cy="100" r="7" fill="#f5ead3" stroke="#70502b"/><circle cx="64" cy="52" r="7" fill="#20150c"/></g>
+          </svg>
+        </div>
+        <div class="game-card-copy"><div><span class="game-number">GAME 01</span><h2>五子棋</h2><p>十五路攻防 · V4 Pattern Engine</p></div><span class="card-arrow" aria-hidden="true">→</span></div>
+      </a>
+
+      <a class="game-card" href="./games/chess/">
+        <div class="game-preview" aria-hidden="true">
+          <svg viewBox="0 0 220 176">
+            <rect x="20" y="4" width="176" height="168" rx="12" fill="#4c2f18" stroke="#d2aa5b" stroke-opacity=".45"/>
+            <g transform="translate(32 16)">
+              <path d="M0 0h152v144H0z" fill="#d8ae72"/>
+              <path d="M0 0h19v18H0zm38 0h19v18H38zm38 0h19v18H76zm38 0h19v18h-19zm19 18h19v18h-19zM95 18h19v18H95zm-38 0h19v18H57zm-38 0h19v18H19zM0 36h19v18H0zm38 0h19v18H38zm38 0h19v18H76zm38 0h19v18h-19zm19 18h19v18h-19zM95 54h19v18H95zm-38 0h19v18H57zm-38 0h19v18H19zM0 72h19v18H0zm38 0h19v18H38zm38 0h19v18H76zm38 0h19v18h-19zm19 18h19v18h-19zM95 90h19v18H95zm-38 0h19v18H57zm-38 0h19v18H19zM0 108h19v18H0zm38 0h19v18H38zm38 0h19v18H76zm38 0h19v18h-19zm19 18h19v18h-19zM95 126h19v18H95zm-38 0h19v18H57zm-38 0h19v18H19z" fill="#76502b"/>
+              <g fill="#20150c" font-family="serif" font-size="28" text-anchor="middle"><text x="28" y="29">♞</text><text x="85" y="66">♛</text></g>
+              <g fill="#f5ead3" stroke="#6c4a27" stroke-width=".5" font-family="serif" font-size="28" text-anchor="middle"><text x="123" y="137">♔</text><text x="66" y="101">♙</text></g>
+            </g>
+          </svg>
+        </div>
+        <div class="game-card-copy"><div><span class="game-number">GAME 02</span><h2>西洋棋</h2><p>完整規則 · 戰術搜尋 AI</p></div><span class="card-arrow" aria-hidden="true">→</span></div>
+      </a>
+
+      <a class="game-card" href="./games/xiangqi/">
+        <div class="game-preview" aria-hidden="true">
+          <svg viewBox="0 0 220 176">
+            <rect x="24" y="3" width="172" height="170" rx="12" fill="#4c2f18" stroke="#d2aa5b" stroke-opacity=".45"/>
+            <rect x="38" y="14" width="144" height="148" rx="4" fill="#bf8b4f"/>
+            <g stroke="#5a3519" stroke-width="1" opacity=".8"><path d="M46 22h128M46 36h128M46 50h128M46 64h128M46 78h128M46 98h128M46 112h128M46 126h128M46 140h128M46 154h128"/><path d="M46 22v132M174 22v132M62 22v56m0 20v56M78 22v56m0 20v56M94 22v56m0 20v56M110 22v56m0 20v56M126 22v56m0 20v56M142 22v56m0 20v56M158 22v56m0 20v56"/><path d="M94 22l32 28m0-28L94 50m0 76l32 28m0-28-32 28"/></g>
+            <g font-family="serif" font-size="14" font-weight="700" text-anchor="middle"><circle cx="110" cy="140" r="10" fill="#f5ead3" stroke="#c9472d"/><text x="110" y="145" fill="#c9472d">帥</text><circle cx="110" cy="36" r="10" fill="#f5ead3" stroke="#1c4e40"/><text x="110" y="41" fill="#1c4e40">將</text><circle cx="62" cy="112" r="10" fill="#f5ead3" stroke="#c9472d"/><text x="62" y="117" fill="#c9472d">炮</text></g>
+          </svg>
+        </div>
+        <div class="game-card-copy"><div><span class="game-number">GAME 03</span><h2>中國象棋</h2><p>楚河漢界 · 中文棋譜</p></div><span class="card-arrow" aria-hidden="true">→</span></div>
+      </a>
+    </section>
+  </main>
+  <footer class="hub-footer">原木棋社目前所有對局均在本機瀏覽器執行；線上配對與房間系統將在下一階段接入。</footer>
+  <script type="module" src="./shared/platform-nav.mjs"></script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#1b1009" />
+  <meta name="description" content="原木棋社五子棋：全 2D 十五路棋盤、L1–L10 AI 與本機雙人對戰。" />
+  <title>五子棋 · 原木棋社</title>
+  <link rel="stylesheet" href="../../styles/platform.css" />
+  <link rel="stylesheet" href="./game.css" />
+</head>
+<body class="platform-page game-page game-gomoku" data-game="gomoku">
+  <a class="skip-link" href="#gomoku-board">跳至棋盤</a>
+  <game-platform-nav></game-platform-nav>
+
+  <header class="gomoku-header">
+    <div class="game-seal" aria-hidden="true">五</div>
+    <div>
+      <p class="game-kicker">FIFTEEN LINES · FIVE IN A ROW</p>
+      <h1>五子棋</h1>
+      <p>平面木盤 · V4 Pattern Engine · L1–L10</p>
+    </div>
+  </header>
+
+  <main class="gomoku-layout">
+    <section class="gomoku-board-zone" aria-label="五子棋棋盤區">
+      <div class="gomoku-frame">
+        <div class="gomoku-stage">
+          <svg id="gomoku-grid" class="gomoku-grid" viewBox="0 0 150 150" width="570" height="570" preserveAspectRatio="none" aria-hidden="true"></svg>
+          <div id="gomoku-board" class="gomoku-board" role="grid" aria-rowcount="15" aria-colcount="15" aria-label="十五乘十五五子棋棋盤"></div>
+        </div>
+      </div>
+      <p class="board-view-label">黑方視角 · 手機可按住拖到交點，放開落子</p>
+    </section>
+
+    <div class="mobile-primary-actions-slot" data-mobile-actions-slot hidden></div>
+
+    <aside class="gomoku-panel" aria-label="對局控制與資訊">
+      <section class="wood-card" aria-labelledby="play-title">
+        <div class="card-heading-row">
+          <div><p class="section-number">01</p><h2 id="play-title">對局</h2></div>
+          <span id="thinking-badge" class="thinking-badge" hidden><i></i>AI 思考中</span>
+        </div>
+        <div class="field-grid">
+          <label>模式
+            <select id="mode-select">
+              <option value="ai">人機對弈（我執黑）</option>
+              <option value="local">本機雙人</option>
+            </select>
+          </label>
+          <label>AI 等級<select id="level-select"></select></label>
+        </div>
+        <div class="turn-row">
+          <span id="turn-badge" class="turn-badge" data-player="black"><i></i><strong>黑方行棋</strong></span>
+          <span id="move-count">0 手</span>
+        </div>
+        <p id="game-status" class="game-status" role="status" aria-live="polite">新局開始，黑方先行。</p>
+        <div class="action-row" role="group" aria-label="對局操作" data-mobile-primary-actions>
+          <button id="new-game" class="wood-btn primary" type="button">新局</button>
+          <button id="undo-move" class="wood-btn" type="button" disabled>悔棋</button>
+        </div>
+      </section>
+
+      <section class="wood-card victory-registration" id="record-panel" aria-labelledby="record-heading" hidden>
+        <div class="card-heading-row"><div><p class="section-number">WIN</p><h2 id="record-heading">勝局登記</h2></div></div>
+        <p class="record-kicker" id="record-summary">擊敗 L6–L10 AI 後可登記排行榜。</p>
+        <div class="record-form" id="record-form">
+          <label for="record-name">排行榜暱稱</label>
+          <input id="record-name" type="text" maxlength="24" autocomplete="nickname" spellcheck="false" />
+          <div class="record-actions">
+            <button id="record-submit" class="wood-btn primary" type="button">登記勝局</button>
+            <button id="record-skip" class="wood-btn" type="button">略過</button>
+          </div>
+        </div>
+        <p class="record-status" id="record-status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="wood-card" aria-labelledby="record-title">
+        <div class="card-heading-row"><div><p class="section-number">02</p><h2 id="record-title">落子記錄</h2></div></div>
+        <ol id="move-list" class="gomoku-moves"><li class="empty-record">尚未落子</li></ol>
+      </section>
+
+      <section class="wood-card connection-card" aria-labelledby="connection-title">
+        <div><p class="section-number">NEXT</p><h2 id="connection-title">線上對戰</h2></div>
+        <p>房間、配對與斷線重連會透過共用 match adapter 接入；目前只開放本機對局。</p>
+        <span class="coming-soon">準備中</span>
+      </section>
+    </aside>
+  </main>
+
+  <section class="leaderboard-section" aria-labelledby="leaderboard-heading">
+    <div class="leaderboard-card">
+      <div class="leaderboard-heading-row">
+        <div>
+          <p class="section-number">RANKING</p>
+          <h2 class="leaderboard-heading" id="leaderboard-heading">五子棋排行榜</h2>
+        </div>
+        <p class="leaderboard-kicker">擊敗 L6–L10 AI 的規則驗證勝局；可依等級篩選，總步數越少排名越前。</p>
+      </div>
+      <div class="leaderboard-levels" id="leaderboard-levels" role="group" aria-label="篩選 AI 等級"></div>
+      <p class="leaderboard-status" id="leaderboard-status" role="status" aria-live="polite"></p>
+      <div class="leaderboard-table-wrap">
+        <table class="leaderboard-table">
+          <thead><tr><th scope="col">#</th><th scope="col">暱稱</th><th scope="col">AI</th><th scope="col">總步數</th><th scope="col">日期</th></tr></thead>
+          <tbody id="leaderboard-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <p id="sr-live" class="visually-hidden" role="status" aria-live="polite"></p>
+  <footer class="gomoku-footer">規則、AI 與 CLI 共用同一套 ES Modules；L6–L10 勝局可登記規則驗證排行榜。</footer>
+  <script type="module" src="../../shared/platform-nav.mjs"></script>
+  <script type="module" src="../../shared/mobile-board-actions.mjs"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

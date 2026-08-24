@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wooden-board-game-club",
+  "compatibility_date": "2026-08-24",
+  "pages_build_output_dir": "./dist",
+  "d1_databases": [
+    {
+      "binding": "LEADERBOARD_DB",
+      "database_name": "wooden-board-game-club-leaderboard",
+      "database_id": "0854835b-ce6c-46af-9905-f6cb603d3d0c",
+      "preview_database_id": "0854835b-ce6c-46af-9905-f6cb603d3d0c"
+    }
+  ]
+}

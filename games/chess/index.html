@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#17110b" />
+  <meta name="description" content="原木棋社西洋棋：完整規則、L1-L10 AI 與本機雙人對戰。" />
+  <title>西洋棋 · 原木棋社</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20rx='18'%20fill='%231d140c'/%3E%3Ctext%20x='50'%20y='76'%20font-size='64'%20text-anchor='middle'%20fill='%23e8bd63'%3E%E2%99%9E%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="../../styles/platform.css" />
+</head>
+<body class="platform-page game-page game-chess" data-game="chess">
+  <noscript>
+    <p class="noscript-note">本站需要啟用 JavaScript 才能對弈。</p>
+  </noscript>
+
+  <game-platform-nav></game-platform-nav>
+
+  <header class="site-header">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><span>♞</span></div>
+      <div class="brand-text">
+        <h1 class="brand-title">西洋棋</h1>
+        <p class="brand-badge">原木棋社 · TACTICAL ENGINE · L1–L10</p>
+      </div>
+    </div>
+    <p class="brand-tag" aria-hidden="true">燃子成焰 · 直搗王座</p>
+  </header>
+
+  <main class="layout">
+    <section class="board-zone" aria-label="棋盤區">
+      <div class="board-wrap" id="boardWrap">
+        <div class="board-frame">
+          <div class="coords coords-ranks" id="coordRanks" aria-hidden="true"></div>
+          <div class="board-grid" id="boardGrid" role="grid" aria-label="西洋棋棋盤，8 乘 8"></div>
+          <div class="coords coords-files" id="coordFiles" aria-hidden="true"></div>
+        </div>
+        <div class="board-banner hidden" id="banner">
+          <p class="banner-kicker" id="bannerKicker"></p>
+          <p class="banner-title" id="bannerTitle"></p>
+          <button class="btn primary" id="bannerAgain" type="button">再來一局</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="mobile-primary-actions-slot" data-mobile-actions-slot hidden></div>
+
+    <aside class="rail">
+      <section class="panel status-panel" aria-label="對局狀態">
+        <div class="status-line">
+          <p class="status-main" id="statusMain" role="status" aria-live="polite">載入中…</p>
+          <span class="thinking hidden" id="thinkingBadge" title="AI 運算中">
+            <i></i><i></i><i></i>
+            <span class="sr-only">AI 思考中</span>
+          </span>
+        </div>
+        <p class="status-sub" id="statusSub"></p>
+      </section>
+
+      <section class="panel controls-panel" aria-label="對局控制">
+        <fieldset class="mode-set">
+          <legend>對戰模式</legend>
+          <div class="segment">
+            <input type="radio" name="mode" id="modeAi" value="ai" checked />
+            <label for="modeAi">人機對戰</label>
+            <input type="radio" name="mode" id="modePvp" value="pvp" />
+            <label for="modePvp">雙人對戰</label>
+          </div>
+        </fieldset>
+        <div class="level-row">
+          <label for="levelSelect">AI 等級</label>
+          <select id="levelSelect"></select>
+        </div>
+        <div class="action-row" role="group" aria-label="對局操作" data-mobile-primary-actions>
+          <button class="btn primary" id="newGameBtn" type="button">新對局</button>
+          <button class="btn ghost" id="hintBtn" type="button" disabled title="以 L7 引擎建議下一步（不會代下）">提示</button>
+          <button class="btn ghost hidden" id="claimDrawBtn" type="button">宣告和棋</button>
+          <button class="btn ghost" id="undoBtn" type="button" disabled>悔棋</button>
+        </div>
+      </section>
+
+      <section class="panel result-panel hidden" id="resultPanel" aria-label="對局結果">
+        <h3 class="panel-heading">對局結果</h3>
+        <p class="result-title" id="resultTitle"></p>
+        <button class="btn ghost block" id="privateSaveBtn" type="button">
+          下載私人 PGN（僅存於此裝置）
+        </button>
+        <p class="fine-print" id="privateNote">
+          私人棋譜只在此瀏覽器產生與下載，不會傳送到網路。
+        </p>
+        <div class="victory-registration" id="record-panel" hidden>
+          <p class="record-kicker" id="record-summary">擊敗 L6–L10 AI 後可登記排行榜。</p>
+          <div class="record-form" id="record-form">
+            <label for="record-name">排行榜暱稱</label>
+            <input id="record-name" type="text" maxlength="24" autocomplete="nickname" spellcheck="false" />
+            <div class="record-actions">
+              <button class="btn primary" id="record-submit" type="button">登記勝局</button>
+              <button class="btn ghost" id="record-skip" type="button">略過</button>
+            </div>
+          </div>
+          <p class="record-status" id="record-status" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="panel captured-panel" aria-label="俘獲棋子">
+        <div class="tray">
+          <h3 class="tray-heading">白方俘獲 <span class="lead" id="leadW"></span></h3>
+          <div class="tray-pieces" id="capW"><span class="tray-empty">尚無斬獲</span></div>
+        </div>
+        <div class="tray">
+          <h3 class="tray-heading">黑方俘獲 <span class="lead" id="leadB"></span></h3>
+          <div class="tray-pieces" id="capB"><span class="tray-empty">尚無斬獲</span></div>
+        </div>
+      </section>
+
+      <section class="panel history-panel" aria-label="棋譜記錄">
+        <h3 class="panel-heading">棋譜</h3>
+        <ol class="move-list" id="moveList"></ol>
+      </section>
+    </aside>
+  </main>
+
+  <section class="community-board leaderboard-section" id="communitySection" aria-labelledby="leaderboard-heading">
+    <div class="community-card leaderboard-card">
+      <div class="leaderboard-heading-row">
+        <div>
+          <p class="section-number">RANKING</p>
+          <h2 class="leaderboard-heading" id="leaderboard-heading">西洋棋排行榜</h2>
+        </div>
+        <p class="leaderboard-kicker">玩家執白擊敗 L6–L10 AI 的規則驗證勝局；可依等級篩選，總步數越少排名越前。</p>
+      </div>
+      <div class="leaderboard-levels" id="leaderboard-levels" role="group" aria-label="篩選 AI 等級"></div>
+      <p class="leaderboard-status" id="leaderboard-status" role="status" aria-live="polite"></p>
+      <div class="leaderboard-table-wrap">
+        <table class="leaderboard-table">
+          <thead>
+            <tr><th scope="col">#</th><th scope="col">暱稱</th><th scope="col">AI</th><th scope="col">總步數</th><th scope="col">日期</th></tr>
+          </thead>
+          <tbody id="leaderboard-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <p>核心規則與 AI 於本機瀏覽器運行 · Web Worker 保持畫面流暢 · L6–L10 勝局可登記規則驗證排行榜</p>
+  </footer>
+
+  <div class="overlay hidden" id="promoOverlay" role="dialog" aria-modal="true" aria-labelledby="promoTitle">
+    <div class="modal-card">
+      <h2 class="modal-title" id="promoTitle">兵卒升變</h2>
+      <p class="modal-text" id="promoText">選擇升變為：</p>
+      <div class="promo-grid" id="promoGrid"></div>
+      <button class="btn ghost block" id="promoCancel" type="button">取消</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="confirmOverlay" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="modal-card">
+      <h2 class="modal-title" id="confirmTitle">開始新對局？</h2>
+      <p class="modal-text" id="confirmBody"></p>
+      <div class="modal-actions">
+        <button class="btn danger" id="confirmOk" type="button">放棄並重開</button>
+        <button class="btn ghost" id="confirmCancel" type="button">繼續目前對局</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="../../shared/platform-nav.mjs"></script>
+  <script type="module" src="../../shared/mobile-board-actions.mjs"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
