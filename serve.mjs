@@ -33,6 +33,15 @@ const MIME = Object.freeze({
   ".woff": "font/woff",
   ".woff2": "font/woff2",
   ".map": "application/json; charset=utf-8",
+  ".wasm": "application/wasm",
+});
+
+// Fairy-Stockfish 的 WASM threads 需要 cross-origin isolation；本機與 Pages
+// 使用同一組回應標頭，避免本機可用、部署後退回的差異。
+const ISOLATION_HEADERS = Object.freeze({
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Embedder-Policy": "require-corp",
+  "Cross-Origin-Resource-Policy": "same-origin",
 });
 
 function resolveWithinRoot(urlPath) {
@@ -56,6 +65,7 @@ async function sendFile(res, filePath) {
     "Content-Length": body.byteLength,
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
+    ...ISOLATION_HEADERS,
   });
   res.end(body);
 }

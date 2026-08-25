@@ -292,36 +292,52 @@ function onSquareKeydown(event) {
 
 const AiClient = (() => {
   let worker = null;
+  let grandmasterWorker = null;
   let localModule = null;
   let sequence = 0;
   const pending = new Map();
+  const grandmasterPending = new Map();
 
-  function disposeWorker() {
+  function disposeSearchWorker() {
     if (worker) {
       worker.terminate();
       worker = null;
     }
   }
 
-  function cancel() {
-    sequence += 1;
-    for (const { reject, timer } of pending.values()) {
-      clearTimeout(timer);
-      const error = new Error("AI 計算已取消");
-      error.cancelled = true;
-      reject(error);
+  function disposeGrandmasterWorker() {
+    if (grandmasterWorker) {
+      grandmasterWorker.terminate();
+      grandmasterWorker = null;
     }
-    pending.clear();
-    disposeWorker();
   }
 
-  function failAll(error) {
-    for (const job of pending.values()) {
-      clearTimeout(job.timer);
-      job.reject(error);
+  function rejectPending(jobs, error) {
+    for (const { reject, timer } of jobs.values()) {
+      clearTimeout(timer);
+      reject(error);
     }
-    pending.clear();
-    disposeWorker();
+    jobs.clear();
+  }
+
+  function cancel() {
+    sequence += 1;
+    const error = new Error("AI 計算已取消");
+    error.cancelled = true;
+    rejectPending(pending, error);
+    rejectPending(grandmasterPending, error);
+    disposeSearchWorker();
+    disposeGrandmasterWorker();
+  }
+
+  function failSearch(error) {
+    rejectPending(pending, error);
+    disposeSearchWorker();
+  }
+
+  function failGrandmaster(error) {
+    rejectPending(grandmasterPending, error);
+    disposeGrandmasterWorker();
   }
 
   function ensureWorker() {
@@ -336,17 +352,37 @@ const AiClient = (() => {
       if (message.ok) job.resolve(message.move);
       else job.reject(new Error(message.error || "AI 無法計算著法"));
     });
-    worker.addEventListener("error", () => failAll(new Error("AI worker 發生錯誤")));
+    worker.addEventListener("error", () => failSearch(new Error("AI worker 發生錯誤")));
     return worker;
+  }
+
+  function ensureGrandmasterWorker() {
+    if (grandmasterWorker) return grandmasterWorker;
+    grandmasterWorker = new Worker(new URL("./xiangqi-grandmaster-worker.js", import.meta.url));
+    grandmasterWorker.addEventListener("message", (event) => {
+      const message = event.data || {};
+      if (message.type === "ready") return;
+      const job = grandmasterPending.get(message.id);
+      if (!job) return;
+      grandmasterPending.delete(message.id);
+      clearTimeout(job.timer);
+      if (message.ok) job.resolve(message.move);
+      else job.reject(new Error(message.error || "巔峰引擎無法計算著法"));
+    });
+    grandmasterWorker.addEventListener("error", (event) => {
+      const detail = event?.message ? `：${event.message}` : "";
+      failGrandmaster(new Error(`巔峰引擎 worker 發生錯誤${detail}`));
+    });
+    return grandmasterWorker;
   }
 
   async function fallback(solveState, solveLevel) {
     if (!localModule) localModule = import("./xiangqi-ai.mjs");
     const module = await localModule;
-    return module.chooseMove(solveState, solveLevel, { maxTimeMs: thinkTimeMs(solveLevel) });
+    return module.chooseMove(solveState, solveLevel, { maxTimeMs: thinkTimeMs(solveLevel) }).move;
   }
 
-  function solve(solveState, solveLevel) {
+  function solveSearch(solveState, solveLevel) {
     const requestId = ++sequence;
     const maxTimeMs = thinkTimeMs(solveLevel);
     try {
@@ -354,7 +390,7 @@ const AiClient = (() => {
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
           pending.delete(requestId);
-          disposeWorker();
+          disposeSearchWorker();
           reject(new Error("AI 思考逾時"));
         }, maxTimeMs + 15000);
         pending.set(requestId, { resolve, reject, timer });
@@ -370,6 +406,37 @@ const AiClient = (() => {
     }
   }
 
+  function solveGrandmaster(solveState) {
+    const requestId = ++sequence;
+    const maxTimeMs = thinkTimeMs(10);
+    try {
+      const activeWorker = ensureGrandmasterWorker();
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          grandmasterPending.delete(requestId);
+          disposeGrandmasterWorker();
+          reject(new Error("巔峰引擎思考逾時"));
+        }, maxTimeMs + 25000);
+        grandmasterPending.set(requestId, { resolve, reject, timer });
+        activeWorker.postMessage({ id: requestId, state: solveState, maxTimeMs });
+      });
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
+
+  function solve(solveState, solveLevel) {
+    if (solveLevel >= 10) {
+      return solveGrandmaster(solveState).catch((error) => {
+        if (error?.cancelled) throw error;
+        // 不支援 SharedArrayBuffer／WASM threads 的環境仍可安全退回原 L10 搜尋。
+        console.warn("L10 巔峰引擎無法啟動，已安全退回本機搜尋。", error);
+        return fallback(solveState, solveLevel);
+      });
+    }
+    return solveSearch(solveState, solveLevel);
+  }
+
   return { solve, cancel };
 })();
 
@@ -378,13 +445,20 @@ async function requestAiMove() {
   const generation = ++aiGeneration;
   aiBusy = true;
   updateControls();
-  announce(`L${level} AI 正在研判局勢…`);
+  announce(level >= 10 ? "L10 巔峰引擎正在研判局勢…" : `L${level} AI 正在研判局勢…`);
   try {
     const move = await AiClient.solve(state, level);
     if (generation !== aiGeneration || gameFinished || mode !== "ai" || state.turn !== "black") return;
-    if (move) commitMove(move);
+    // 外部 UCI 引擎的輸出一律回到本專案規則引擎核對；任何格式或座標差異
+    // 都不得繞過合法著法與自陷將軍檢查。
+    const legalMove = getLegalMoves(state).find((candidate) => isSameMove(candidate, move));
+    if (!legalMove) throw new Error("AI 回傳了不合法著法");
+    commitMove(legalMove);
   } catch (error) {
-    if (!error?.cancelled) announce("AI 暫時無法回應，請按「新局」重開或改用雙人模式。", true);
+    if (!error?.cancelled) {
+      console.warn("AI 著法未採用。", error);
+      announce("AI 暫時無法回應，請按「新局」重開或改用雙人模式。", true);
+    }
   } finally {
     if (generation === aiGeneration) {
       aiBusy = false;

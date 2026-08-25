@@ -50,6 +50,12 @@ npm run build
 
 `dist/` 只包含瀏覽器必要資產，不含測試、CLI 或設計文件，可直接交給 Cloudflare Pages。
 
+## L10 巔峰引擎與授權
+
+中國象棋 L10 在瀏覽器內使用本機隨附的 Fairy-Stockfish NNUE WebAssembly，透過 UCI 的象棋變體分析局面；棋局不會送到伺服器。L1–L9 與提示則維持專案內原本可重現的搜尋引擎。若瀏覽器不支援 WASM threads 或 cross-origin isolation，L10 會安全退回本機搜尋，且所有引擎輸出都必須再次通過專案規則引擎的合法著法檢查。
+
+因為隨附 GPL-3.0 的引擎物件碼，整個專案以 **GPL-3.0-or-later** 提供；完整條文在 [LICENSE](LICENSE)，上游版本、對應原始碼與來源連結見 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
 ## 排行榜資料庫
 
 三款遊戲共用獨立 D1 `wooden-board-game-club-leaderboard`，綁定名稱為 `LEADERBOARD_DB`。排行榜只接受玩家擊敗 L6–L10 AI 的完整棋譜；Pages Function 會用各遊戲規則引擎重新播放後才寫入。

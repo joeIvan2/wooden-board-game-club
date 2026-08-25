@@ -4,6 +4,7 @@
   "description": "原木棋社：五子棋、西洋棋與中國象棋的統一 2D 平台",
   "type": "module",
   "private": true,
+  "license": "GPL-3.0-or-later",
   "scripts": {
     "build": "node build-dist.mjs",
     "start": "node serve.mjs",

@@ -7,6 +7,9 @@ const DIST = join(ROOT, "dist");
 if (relative(ROOT, DIST) !== "dist") throw new Error("dist path escaped the project root");
 
 const assets = [
+  "_headers",
+  "LICENSE",
+  "THIRD_PARTY_NOTICES.md",
   "index.html",
   "styles/platform.css",
   "shared/game-registry.mjs",
@@ -36,6 +39,10 @@ const assets = [
   "games/xiangqi/xiangqi-rules.mjs",
   "games/xiangqi/xiangqi-ai.mjs",
   "games/xiangqi/xiangqi-ai-worker.mjs",
+  "games/xiangqi/xiangqi-grandmaster-worker.js",
+  "games/xiangqi/vendor/fairy-stockfish-nnue-1.1.11/stockfish.js",
+  "games/xiangqi/vendor/fairy-stockfish-nnue-1.1.11/stockfish.wasm",
+  "games/xiangqi/vendor/fairy-stockfish-nnue-1.1.11/stockfish.worker.js",
   "games/xiangqi/xiangqi-notation.mjs",
   "games/xiangqi/terminal-render.mjs"
 ];
