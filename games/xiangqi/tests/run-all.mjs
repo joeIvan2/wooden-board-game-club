@@ -9,6 +9,8 @@ import { join, dirname } from "node:path";
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const SUITES = [
   "rules-special.test.mjs",
+  "endgame.test.mjs",
+  "ai.test.mjs",
   "terminal-render.test.mjs",
   "frontend.test.mjs",
 ];

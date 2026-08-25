@@ -134,6 +134,7 @@ function buildBoard() {
 
 const AiClient = (() => {
   let worker = null;
+  let workerKind = null;
   let seq = 0;
   const pending = new Map();
 
@@ -143,6 +144,7 @@ const AiClient = (() => {
         worker.terminate();
       } catch {}
       worker = null;
+      workerKind = null;
     }
   }
 
@@ -169,10 +171,15 @@ const AiClient = (() => {
     dropWorker();
   }
 
-  function getWorker() {
+  function getWorker(solveLevel) {
+    const desiredKind = solveLevel <= 5 ? "classic" : "fairy";
+    if (worker && workerKind !== desiredKind) dropWorker();
     if (worker) return worker;
     try {
-      worker = new Worker(new URL("../../shared/stockfish-engine-worker.js", import.meta.url));
+      worker = desiredKind === "classic"
+        ? new Worker(new URL("./chess-ai-worker.mjs", import.meta.url), { type: "module" })
+        : new Worker(new URL("../../shared/stockfish-engine-worker.js", import.meta.url));
+      workerKind = desiredKind;
       worker.addEventListener("message", (event) => {
         const data = event.data || {};
         if (data.type === "ready") return;
@@ -185,25 +192,27 @@ const AiClient = (() => {
       });
       worker.addEventListener("error", () => {
         dropWorker();
-        failAllPending("Fairy-Stockfish worker 發生錯誤");
+        failAllPending(desiredKind === "classic" ? "本機快速 AI worker 發生錯誤" : "Fairy-Stockfish worker 發生錯誤");
       });
       return worker;
     } catch (error) {
-      throw new Error(`無法建立 Fairy-Stockfish worker：${error?.message || error}`);
+      const label = desiredKind === "classic" ? "本機快速 AI" : "Fairy-Stockfish";
+      throw new Error(`無法建立 ${label} worker：${error?.message || error}`);
     }
   }
 
   function viaWorker(solveState, solveLevel, solveContext) {
-    const w = getWorker();
+    const isClassic = solveLevel <= 5;
+    const w = getWorker(solveLevel);
     if (!w) return Promise.reject(new Error("無法建立 AI worker"));
     return new Promise((resolve, reject) => {
       const id = ++seq;
-      const maxTimeMs = engineThinkTimeMs(solveLevel);
+      const maxTimeMs = isClassic ? [350, 500, 750, 1100, 1500][solveLevel - 1] : engineThinkTimeMs(solveLevel);
       const timer = setTimeout(() => {
         pending.delete(id);
         dropWorker();
-        reject(new Error("Fairy-Stockfish 思考逾時"));
-      }, maxTimeMs + 25000);
+        reject(new Error(isClassic ? "本機快速 AI 思考逾時" : "Fairy-Stockfish 思考逾時"));
+      }, maxTimeMs + (isClassic ? 1000 : 25000));
       pending.set(id, { resolve, reject, timer });
       w.postMessage({
         id,
@@ -379,7 +388,7 @@ function startAiTurn() {
       const legalMove = move && posLegal.find((candidate) => sameMoveShape(candidate, move));
       if (!legalMove) {
         render();
-        flashNotice("Fairy-Stockfish 未回傳合法著法；請重新開始本局。");
+        flashNotice(`${level <= 5 ? "本機快速 AI" : "Fairy-Stockfish"} 未回傳合法著法；請重新開始本局。`);
         return;
       }
       executeMove({ ...legalMove, __fromAi: true });

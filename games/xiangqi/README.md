@@ -1,6 +1,6 @@
 # 楚河漢界 · 象棋衝鋒社
 
-純本機的中國象棋 web 產品。瀏覽器的 L1–L10 與提示僅使用本機隨附的 Fairy-Stockfish NNUE WebAssembly；規則與記譜由原生 ES Modules 提供。所有棋局與私人棋譜只存在使用者裝置，沒有遠端 AI 或棋局上傳。
+純本機的中國象棋 web 產品。L1–L5 使用原本的快速本機 AI；L6–L10 與提示使用本機隨附的 Fairy-Stockfish NNUE WebAssembly。規則與記譜由原生 ES Modules 提供。所有棋局與私人棋譜只存在使用者裝置，沒有遠端 AI 或棋局上傳。
 
 ## 快速開始
 
@@ -17,7 +17,7 @@ npm test                  # 執行 Node assert 測試
 - **完整規則（9×10，紅先）**：九宮、河界、照面禁著、馬腿、象眼、炮架、將軍／將死／困斃與合法著法驗證。
 - **模式與操作**：人機對弈、雙人對戰、點擊、觸控與全鍵盤操作。
 - **對局工具**：新局、悔棋、翻面、提示、中文縱線／座標記法、被吃子力統計、終局面板與私人棋譜下載。
-- **AI L1–L10**：所有等級與提示均由同一個 Fairy-Stockfish NNUE WebAssembly 計算；透過 UCI Skill Level 與思考時間區分難度。規則模組會再次核對引擎回傳著法；若引擎失敗，畫面明確回報，絕不暗中改用其他演算法。
+- **AI L1–L10**：L1–L5 固定使用快速本機 AI，並採 0.35–1.5 秒上限；L6–L10 與提示固定使用 Fairy-Stockfish NNUE。這是選擇等級時的固定分流，非錯誤 fallback。規則模組會再次核對每一個回傳著法。
 - **隱私與無障礙**：資料僅保存在 `localStorage` 與使用者主動下載的檔案；支援 ARIA、鍵盤焦點、44px 觸控目標與 reduced motion。
 
 ## 測試
@@ -35,6 +35,7 @@ node tests/frontend.test.mjs          # UI、Worker、CSS 與零外連契約
 |---|---|
 | `xiangqi-rules.mjs` | 規則、合法著法、將軍／終局與 Perft |
 | `xiangqi-notation.mjs` | 中文縱線與座標記法 |
+| `xiangqi-ai.mjs` / `xiangqi-ai-worker.mjs` | L1–L5 快速本機 AI |
 | `../../shared/stockfish-engine-worker.js` | 共用 Fairy-Stockfish UCI Worker（西洋棋／中國象棋） |
 | `app.js` / `index.html` / `css/style.css` | 瀏覽器 UI、存檔、下載與無障礙互動 |
 | `serve.mjs` | 零依賴本機靜態伺服器 |

@@ -1,7 +1,7 @@
 // Pure Gomoku rule helpers shared by the browser and headless arena.
 // Board values are 0 (empty), 1 (black), and 2 (white); five or more wins.
-// It intentionally does not import an AI module, so the game UI stays coupled
-// only to the pinned Rapfi engine.
+// It intentionally does not import an AI module; the V4 search stays behind a
+// dedicated worker and every returned move is still validated by these rules.
 export const BOARD_SIZE = 15;
 export const CELLS = BOARD_SIZE * BOARD_SIZE;
 

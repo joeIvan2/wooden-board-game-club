@@ -84,8 +84,13 @@ function requiredElementsPresent() {
 
 const colorName = (color) => (color === "red" ? "紅方" : "黑方");
 
-/** 每一級都交給同一個本機 Fairy-Stockfish 引擎；只調整思考時間。 */
+/** L1–L5 是快速本機 AI；L6–L10 使用 Fairy-Stockfish。 */
 function thinkTimeMs(solveLevel) {
+  if (solveLevel <= 1) return 350;
+  if (solveLevel <= 2) return 500;
+  if (solveLevel <= 3) return 750;
+  if (solveLevel <= 4) return 1100;
+  if (solveLevel <= 5) return 1500;
   if (solveLevel >= 10) return 6000;
   if (solveLevel >= 9) return 4500;
   if (solveLevel >= 7) return 3200;
@@ -289,6 +294,7 @@ function onSquareKeydown(event) {
 
 const AiClient = (() => {
   let worker = null;
+  let workerKind = null;
   let sequence = 0;
   const pending = new Map();
 
@@ -296,6 +302,7 @@ const AiClient = (() => {
     if (worker) {
       worker.terminate();
       worker = null;
+      workerKind = null;
     }
   }
 
@@ -320,9 +327,14 @@ const AiClient = (() => {
     disposeWorker();
   }
 
-  function ensureWorker() {
+  function ensureWorker(solveLevel) {
+    const desiredKind = solveLevel <= 5 ? "classic" : "fairy";
+    if (worker && workerKind !== desiredKind) disposeWorker();
     if (worker) return worker;
-    worker = new Worker(new URL("../../shared/stockfish-engine-worker.js", import.meta.url));
+    worker = desiredKind === "classic"
+      ? new Worker(new URL("./xiangqi-ai-worker.mjs", import.meta.url), { type: "module" })
+      : new Worker(new URL("../../shared/stockfish-engine-worker.js", import.meta.url));
+    workerKind = desiredKind;
     worker.addEventListener("message", (event) => {
       const message = event.data || {};
       if (message.type === "ready") return;
@@ -335,7 +347,8 @@ const AiClient = (() => {
     });
     worker.addEventListener("error", (event) => {
       const detail = event?.message ? `：${event.message}` : "";
-      fail(new Error(`Fairy-Stockfish worker 發生錯誤${detail}`));
+      const label = desiredKind === "classic" ? "本機快速 AI" : "Fairy-Stockfish";
+      fail(new Error(`${label} worker 發生錯誤${detail}`));
     });
     return worker;
   }
@@ -343,14 +356,15 @@ const AiClient = (() => {
   function solve(solveState, solveLevel) {
     const requestId = ++sequence;
     const maxTimeMs = thinkTimeMs(solveLevel);
+    const isClassic = solveLevel <= 5;
     return new Promise((resolve, reject) => {
       try {
-        const activeWorker = ensureWorker();
+        const activeWorker = ensureWorker(solveLevel);
         const timer = setTimeout(() => {
           pending.delete(requestId);
           disposeWorker();
-          reject(new Error("Fairy-Stockfish 思考逾時"));
-        }, maxTimeMs + 25000);
+          reject(new Error(isClassic ? "本機快速 AI 思考逾時" : "Fairy-Stockfish 思考逾時"));
+        }, maxTimeMs + (isClassic ? 1000 : 25000));
         pending.set(requestId, { resolve, reject, timer });
         activeWorker.postMessage({
           id: requestId,
@@ -358,6 +372,7 @@ const AiClient = (() => {
           state: solveState,
           level: solveLevel,
           maxTimeMs,
+          options: isClassic ? { maxTimeMs } : undefined,
         });
       } catch (error) {
         reject(error);
@@ -373,11 +388,11 @@ async function requestAiMove() {
   const generation = ++aiGeneration;
   aiBusy = true;
   updateControls();
-  announce(`L${level} Fairy-Stockfish 正在研判局勢…`);
+  announce(`L${level} ${level <= 5 ? "本機快速 AI" : "Fairy-Stockfish"} 正在研判局勢…`);
   try {
     const move = await AiClient.solve(state, level);
     if (generation !== aiGeneration || gameFinished || mode !== "ai" || state.turn !== "black") return;
-    // 外部 UCI 引擎的輸出一律回到本專案規則引擎核對；任何格式或座標差異
+    // 不論採用哪一級 AI，輸出一律回到本專案規則引擎核對；任何格式或座標差異
     // 都不得繞過合法著法與自陷將軍檢查。
     const legalMove = getLegalMoves(state).find((candidate) => isSameMove(candidate, move));
     if (!legalMove) throw new Error("AI 回傳了不合法著法");

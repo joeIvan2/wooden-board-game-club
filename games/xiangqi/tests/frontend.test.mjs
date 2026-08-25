@@ -27,6 +27,8 @@ const JS_FILES = [
   "app.js",
   "serve.mjs",
   "xiangqi-rules.mjs",
+  "xiangqi-ai.mjs",
+  "xiangqi-ai-worker.mjs",
   "xiangqi-notation.mjs",
   "terminal-render.mjs",
   "tests/helpers.mjs",
@@ -69,13 +71,16 @@ await check("HTML 基本結構：module script、樣式表、語言、視口、�
   assert.match(html, /class="skip-link"/);
 });
 
-await check("Worker 鏈：app.js 只載入 Fairy-Stockfish，且規則引擎仍核對回傳著法", async () => {
+await check("Worker 鏈：L1–L5 使用本機快速 AI，L6–L10 使用 Fairy-Stockfish，且規則引擎仍核對回傳著法", async () => {
+  assert.match(appJs, /solveLevel <= 5 \? "classic" : "fairy"/);
+  assert.match(appJs, /new URL\("\.\/xiangqi-ai-worker\.mjs", import\.meta\.url\)/);
   assert.match(appJs, /new Worker\(new URL\("\.\.\/\.\.\/shared\/stockfish-engine-worker\.js", import\.meta\.url\)\)/);
-  assert.doesNotMatch(appJs, /xiangqi-ai-worker|xiangqi-ai\.mjs|fallback/);
   assert.match(appJs, /getLegalMoves\(state\)\.find\(\(candidate\) => isSameMove\(candidate, move\)\)/);
   const worker = await readFile(join(ROOT, "..", "..", "shared", "stockfish-engine-worker.js"), "utf8");
   assert.match(worker, /UCI_Variant value \$\{game === "xiangqi" \? "xiangqi" : "chess"\}/);
   assert.match(worker, /setoption name Skill Level value/);
+  const classicWorker = await read("xiangqi-ai-worker.mjs");
+  assert.match(classicWorker, /from "\.\/xiangqi-ai\.mjs"/);
 });
 
 await check("規則引擎輸出 API 完整（規則/終局/Perft 皆可呼叫）", async () => {
@@ -147,7 +152,8 @@ await check("README 涵蓋啟動、測試與 AI 等級說明", async () => {
   assert.match(readme, /npm (run )?test|node tests\/run-all\.mjs/);
   assert.match(readme, /L10/);
   assert.match(readme, /Fairy-Stockfish/);
-  assert.doesNotMatch(readme, /xiangqi-cli|自研.*AI|確定性 AI/);
+  assert.match(readme, /L1–L5/);
+  assert.doesNotMatch(readme, /xiangqi-cli/);
 });
 
 console.log(`\nfrontend：${passed} 項全數通過`);

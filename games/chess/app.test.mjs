@@ -219,7 +219,7 @@ function spyClearTimeout(timer) {
 
 const aiClientBlock = extractBetween("const AiClient = (() => {", "function refreshDerived");
 assert.ok(aiClientBlock.includes("import.meta.url"), "AiClient block unexpectedly changed");
-const aiClientPatched = aiClientBlock.replace("import.meta.url", "__workerBaseUrl");
+const aiClientPatched = aiClientBlock.replaceAll("import.meta.url", "__workerBaseUrl");
 const buildAiClient = new Function(
   "Worker",
   "URL",
