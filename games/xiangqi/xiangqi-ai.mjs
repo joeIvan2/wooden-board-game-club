@@ -14,6 +14,7 @@ import {
   BOARD_ROWS,
   BOARD_COLS,
   generatePseudoMovesForPiece,
+  isKingAttacked,
   leavesOwnKingAttacked,
 } from "./xiangqi-rules.mjs";
 
@@ -31,7 +32,12 @@ const MATERIAL = Object.freeze({
   soldier: 100,
 });
 
-/** 各等級搜尋參數：深度上限、靜態搜尋深度、節點預算、是否只用物質評估。 */
+/**
+ * 各等級搜尋參數。
+ *
+ * L7 起啟用換位表與累積式著法排序，避免高階等級在固定時間內因重複搜尋
+ * 反而只完成較淺的一輪。靜態搜尋的深度也改成保守遞增，而不是無節制堆高。
+ */
 const LEVELS = Object.freeze([
   /* L1 */ Object.freeze({ depth: 1, quiescence: 0, maxNodes: 2_000, materialOnly: true }),
   /* L2 */ Object.freeze({ depth: 1, quiescence: 0, maxNodes: 6_000, materialOnly: false }),
@@ -39,15 +45,75 @@ const LEVELS = Object.freeze([
   /* L4 */ Object.freeze({ depth: 2, quiescence: 4, maxNodes: 45_000, materialOnly: false }),
   /* L5 */ Object.freeze({ depth: 3, quiescence: 4, maxNodes: 90_000, materialOnly: false }),
   /* L6 */ Object.freeze({ depth: 3, quiescence: 6, maxNodes: 160_000, materialOnly: false }),
-  /* L7 */ Object.freeze({ depth: 4, quiescence: 6, maxNodes: 260_000, materialOnly: false }),
-  /* L8 */ Object.freeze({ depth: 4, quiescence: 8, maxNodes: 420_000, materialOnly: false }),
-  /* L9 */ Object.freeze({ depth: 5, quiescence: 8, maxNodes: 650_000, materialOnly: false }),
-  /* L10 */ Object.freeze({ depth: 6, quiescence: 10, maxNodes: 900_000, materialOnly: false }),
+  /* L7 */ Object.freeze({ depth: 4, quiescence: 4, maxNodes: 260_000, materialOnly: false, ttEntries: 24_000, checkAwareQuiescence: true }),
+  /* L8 */ Object.freeze({ depth: 4, quiescence: 5, maxNodes: 420_000, materialOnly: false, ttEntries: 48_000, checkAwareQuiescence: true }),
+  /* L9 */ Object.freeze({ depth: 5, quiescence: 6, maxNodes: 650_000, materialOnly: false, ttEntries: 80_000, checkAwareQuiescence: true }),
+  /* L10 */ Object.freeze({ depth: 6, quiescence: 7, maxNodes: 900_000, materialOnly: false, ttEntries: 120_000, checkAwareQuiescence: true }),
 ]);
 
 class SearchBudgetExceeded extends Error {}
 
 const other = (color) => (color === "red" ? "black" : "red");
+
+const PIECE_CODES = Object.freeze({
+  general: 0,
+  rook: 1,
+  cannon: 2,
+  horse: 3,
+  advisor: 4,
+  elephant: 5,
+  soldier: 6,
+});
+const PIECE_VARIANTS = 14;
+const ZOBRIST_SIZE = BOARD_ROWS * BOARD_COLS * PIECE_VARIANTS;
+const ZOBRIST_A = new Uint32Array(ZOBRIST_SIZE);
+const ZOBRIST_B = new Uint32Array(ZOBRIST_SIZE);
+const SIDE_A = 0x9e3779b9;
+const SIDE_B = 0x85ebca6b;
+const MATE_THRESHOLD = MATE_SCORE - 10_000;
+
+/** 固定種子的 32-bit xorshift：雜湊表不依賴隨機來源，因此結果可重現。 */
+function nextRandom(seed) {
+  let value = seed >>> 0;
+  value ^= value << 13;
+  value ^= value >>> 17;
+  value ^= value << 5;
+  return value >>> 0;
+}
+
+{
+  let seedA = 0x7f4a7c15;
+  let seedB = 0x243f6a88;
+  for (let index = 0; index < ZOBRIST_SIZE; index += 1) {
+    seedA = nextRandom(seedA);
+    seedB = nextRandom(seedB);
+    ZOBRIST_A[index] = seedA;
+    ZOBRIST_B[index] = seedB;
+  }
+}
+
+function pieceHashIndex(piece, row, col) {
+  const side = piece.color === "red" ? 0 : 7;
+  return ((row * BOARD_COLS + col) * PIECE_VARIANTS) + side + PIECE_CODES[piece.type];
+}
+
+/** 90 格座標編碼，便於雜湊表／killer／history 無配置地比較著法。 */
+function moveCode(move) {
+  return ((move.from.row * BOARD_COLS + move.from.col) * (BOARD_ROWS * BOARD_COLS))
+    + (move.to.row * BOARD_COLS + move.to.col);
+}
+
+function scoreToTable(score, ply) {
+  if (score >= MATE_THRESHOLD) return score + ply;
+  if (score <= -MATE_THRESHOLD) return score - ply;
+  return score;
+}
+
+function scoreFromTable(score, ply) {
+  if (score >= MATE_THRESHOLD) return score - ply;
+  if (score <= -MATE_THRESHOLD) return score + ply;
+  return score;
+}
 
 /** 簡單位置加權（紅黑對稱）：兵推進、馬居中、炮佔中路、士象歸位。 */
 function positional(type, color, row, col) {
@@ -142,15 +208,38 @@ function captureOrderScore(board, move) {
   return MATERIAL[victim.type] * 32 - MATERIAL[mover.type] / 16;
 }
 
-function orderMoves(board, moves) {
+/**
+ * 固定、可重現的著法排序：TT 的 PV 著法優先，其次吃子、killer 與 history。
+ * 低階 AI 不傳啟發資料，仍維持原本的單純 MVV-LVA 排序。
+ */
+function orderMoves(board, moves, {
+  preferredCode = null,
+  history = null,
+  killers = null,
+  ply = 0,
+} = {}) {
   const decorated = moves.map((move, index) => ({
     move,
     index,
-    key: `${move.from.row}${move.from.col}${move.to.row}${move.to.col}`,
-    score: captureOrderScore(board, move),
+    code: moveCode(move),
+    score: 0,
   }));
-  // Array#sort 在現代引擎為穩定排序；再以座標字串做最終決定性平手裁決。
-  decorated.sort((a, b) => (b.score - a.score) || (a.key < b.key ? -1 : a.key > b.key ? 1 : a.index - b.index));
+
+  for (const entry of decorated) {
+    const victim = board[entry.move.to.row][entry.move.to.col];
+    if (entry.code === preferredCode) {
+      entry.score = 100_000_000;
+    } else if (victim) {
+      entry.score = 10_000_000 + captureOrderScore(board, entry.move);
+    } else if (killers?.[ply]?.includes(entry.code)) {
+      entry.score = 1_000_000;
+    } else {
+      entry.score = captureOrderScore(board, entry.move) + (history?.get(entry.code) ?? 0);
+    }
+  }
+
+  // Array#sort 在現代引擎為穩定排序；座標編碼是最後的確定性平手裁決。
+  decorated.sort((a, b) => (b.score - a.score) || (a.code - b.code) || (a.index - b.index));
   return decorated.map((entry) => entry.move);
 }
 
@@ -160,7 +249,24 @@ function orderMoves(board, moves) {
  */
 function createContext(board, config, budget) {
   let nodes = 0;
+  let ttHits = 0;
+  let ttCutoffs = 0;
   const deadline = config.deadline;
+  const table = config.ttEntries ? new Map() : null;
+  const history = table ? new Map() : null;
+  const killers = table ? [] : null;
+  let hashA = 0;
+  let hashB = 0;
+
+  for (let row = 0; row < BOARD_ROWS; row += 1) {
+    for (let col = 0; col < BOARD_COLS; col += 1) {
+      const piece = board[row][col];
+      if (!piece) continue;
+      const index = pieceHashIndex(piece, row, col);
+      hashA = (hashA ^ ZOBRIST_A[index]) >>> 0;
+      hashB = (hashB ^ ZOBRIST_B[index]) >>> 0;
+    }
+  }
 
   function tick() {
     nodes += 1;
@@ -182,9 +288,65 @@ function createContext(board, config, budget) {
     return moves;
   }
 
+  function toggleHash(piece, row, col) {
+    const index = pieceHashIndex(piece, row, col);
+    hashA = (hashA ^ ZOBRIST_A[index]) >>> 0;
+    hashB = (hashB ^ ZOBRIST_B[index]) >>> 0;
+  }
+
+  function tableKey(color) {
+    return {
+      index: (hashA ^ (color === "red" ? 0 : SIDE_A)) >>> 0,
+      lock: (hashB ^ (color === "red" ? 0 : SIDE_B)) >>> 0,
+    };
+  }
+
+  function probeTable(color, ply) {
+    if (!table) return null;
+    const { index, lock } = tableKey(color);
+    const entry = table.get(index);
+    if (!entry || entry.lock !== lock) return null;
+    ttHits += 1;
+    return { ...entry, score: scoreFromTable(entry.score, ply) };
+  }
+
+  function storeTable(color, depth, flag, score, bestCode, ply) {
+    if (!table) return;
+    const { index, lock } = tableKey(color);
+    const previous = table.get(index);
+    if (previous && previous.lock === lock && previous.depth > depth) return;
+    if (!previous && table.size >= config.ttEntries) {
+      // 固定上限避免瀏覽器背景 worker 在長局中無限制吃記憶體。
+      table.delete(table.keys().next().value);
+    }
+    table.set(index, {
+      lock,
+      depth,
+      flag,
+      score: scoreToTable(score, ply),
+      bestCode,
+    });
+  }
+
+  function rememberQuietCutoff(move, captured, depth, ply) {
+    if (!history || captured) return;
+    const code = moveCode(move);
+    const pair = killers[ply] ?? [];
+    if (pair[0] !== code) killers[ply] = [code, pair[0]].filter((value) => value !== undefined);
+    const next = Math.min(900_000, (history.get(code) ?? 0) + depth * depth * 32);
+    history.set(code, next);
+  }
+
+  function orderedMoves(moves, preferredCode = null, ply = 0) {
+    return orderMoves(board, moves, { preferredCode, history, killers, ply });
+  }
+
   function make(move) {
     const moving = board[move.from.row][move.from.col];
     const captured = board[move.to.row][move.to.col];
+    toggleHash(moving, move.from.row, move.from.col);
+    if (captured) toggleHash(captured, move.to.row, move.to.col);
+    toggleHash(moving, move.to.row, move.to.col);
     board[move.to.row][move.to.col] = moving;
     board[move.from.row][move.from.col] = null;
     return captured ?? null;
@@ -192,14 +354,40 @@ function createContext(board, config, budget) {
 
   function unmake(move, captured) {
     const moving = board[move.to.row][move.to.col];
+    toggleHash(moving, move.to.row, move.to.col);
+    if (captured) toggleHash(captured, move.to.row, move.to.col);
+    toggleHash(moving, move.from.row, move.from.col);
     board[move.from.row][move.from.col] = moving;
     board[move.to.row][move.to.col] = captured ?? null;
   }
 
-  function quiesce(alpha, beta, color, qdepth) {
+  function quiesce(alpha, beta, color, qdepth, ply) {
     tick();
     const staticScore = evaluateBoard(board, config.materialOnly);
     const stand = color === "red" ? staticScore : -staticScore;
+    const inCheck = config.checkAwareQuiescence && isKingAttacked(board, color);
+
+    // 過去版本在被將軍的葉節點直接 stand-pat，可能把「必須應將」的局面
+    // 誤當成可自由評估的安靜局面。高階搜尋在此改為搜尋所有合法應將著。
+    if (inCheck) {
+      if (qdepth < 0) return stand;
+      const evasions = orderedMoves(legalMoves(color), null, ply);
+      if (evasions.length === 0) return -(MATE_SCORE - ply);
+      let best = -Infinity;
+      for (const move of evasions) {
+        const captured = make(move);
+        const score = -quiesce(-beta, -alpha, other(color), qdepth - 1, ply + 1);
+        unmake(move, captured);
+        if (score > best) best = score;
+        if (best > alpha) alpha = best;
+        if (alpha >= beta) {
+          rememberQuietCutoff(move, captured, Math.max(1, qdepth), ply);
+          break;
+        }
+      }
+      return best;
+    }
+
     // 失軟（fail-soft）：即使超出視窗也回傳真實評估，
     // 避免不同著法在根節點被壓成同分而靠座標排序誤選。
     if (qdepth <= 0 || stand >= beta) return stand;
@@ -210,15 +398,18 @@ function createContext(board, config, budget) {
     for (const move of generateTactical(color)) {
       if (!leavesOwnKingAttacked(board, color, move.from, move.to)) tactical.push(move);
     }
-    for (const move of orderMoves(board, tactical)) {
+    for (const move of orderedMoves(tactical, null, ply)) {
       const captured = make(move);
-      const score = -quiesce(-beta, -alpha, other(color), qdepth - 1);
+      const score = -quiesce(-beta, -alpha, other(color), qdepth - 1, ply + 1);
       unmake(move, captured);
       if (score > best) {
         best = score;
         if (score > alpha) {
           alpha = score;
-          if (score >= beta) break;
+          if (score >= beta) {
+            rememberQuietCutoff(move, captured, qdepth, ply);
+            break;
+          }
         }
       }
     }
@@ -241,27 +432,54 @@ function createContext(board, config, budget) {
 
   function negamax(depth, alpha, beta, color, ply) {
     tick();
-    if (depth <= 0) return quiesce(alpha, beta, color, config.quiescence);
-    const moves = orderMoves(board, legalMoves(color));
+    if (depth <= 0) return quiesce(alpha, beta, color, config.quiescence, ply);
+
+    const originalAlpha = alpha;
+    const originalBeta = beta;
+    const cached = probeTable(color, ply);
+    let preferredCode = cached?.bestCode ?? null;
+    if (cached && cached.depth >= depth) {
+      if (cached.flag === "exact") return cached.score;
+      if (cached.flag === "lower") alpha = Math.max(alpha, cached.score);
+      if (cached.flag === "upper") beta = Math.min(beta, cached.score);
+      if (alpha >= beta) {
+        ttCutoffs += 1;
+        return cached.score;
+      }
+    }
+
+    const moves = orderedMoves(legalMoves(color), preferredCode, ply);
     if (moves.length === 0) {
       // 將死或困斃：行棋方皆直接落敗（中國象棋規則），距離越近分數越極端。
       return -(MATE_SCORE - ply);
     }
     let best = -Infinity;
+    let bestCode = preferredCode;
     for (const move of moves) {
       const captured = make(move);
       const score = -negamax(depth - 1, -beta, -alpha, other(color), ply + 1);
       unmake(move, captured);
-      if (score > best) best = score;
+      if (score > best) {
+        best = score;
+        bestCode = moveCode(move);
+      }
       if (best > alpha) alpha = best;
-      if (alpha >= beta) break;
+      if (alpha >= beta) {
+        rememberQuietCutoff(move, captured, depth, ply);
+        break;
+      }
     }
+    const flag = best <= originalAlpha ? "upper" : best >= originalBeta ? "lower" : "exact";
+    storeTable(color, depth, flag, best, bestCode, ply);
     return best;
   }
 
   return {
     nodesUsed: () => nodes,
+    ttHits: () => ttHits,
+    ttCutoffs: () => ttCutoffs,
     legalMoves,
+    orderedMoves,
     make,
     unmake,
     negamax,
@@ -287,7 +505,7 @@ function coordinateKey(move) {
  * @param {object} state 規則引擎狀態。
  * @param {number} level 1–10。
  * @param {object} [options] { maxNodes?, maxTimeMs? }
- * @returns {{move: object|null, meta: {score: number, depth: number, nodes: number}}}
+ * @returns {{move: object|null, meta: {score: number, depth: number, nodes: number, ttHits: number, ttCutoffs: number}}}
  */
 export function chooseMove(state, level = 6, options = {}) {
   const config = LEVELS[clampLevel(level) - 1];
@@ -296,15 +514,31 @@ export function chooseMove(state, level = 6, options = {}) {
   const deadline = Number.isFinite(options.maxTimeMs) && options.maxTimeMs > 0
     ? Date.now() + options.maxTimeMs
     : null;
-  const ctx = createContext(board, { materialOnly: config.materialOnly, quiescence: config.quiescence, deadline }, budget);
+  const ctx = createContext(board, {
+    materialOnly: config.materialOnly,
+    quiescence: config.quiescence,
+    ttEntries: config.ttEntries ?? 0,
+    checkAwareQuiescence: config.checkAwareQuiescence ?? false,
+    deadline,
+  }, budget);
 
   const color = state.turn;
   const rootMoves = ctx.legalMoves(color);
   if (rootMoves.length === 0) {
-    return { move: null, meta: { score: -(MATE_SCORE), depth: 0, nodes: ctx.nodesUsed() } };
+    return {
+      move: null,
+      meta: {
+        score: -(MATE_SCORE), depth: 0, nodes: ctx.nodesUsed(), ttHits: ctx.ttHits(), ttCutoffs: ctx.ttCutoffs(),
+      },
+    };
   }
   if (rootMoves.length === 1) {
-    return { move: rootMoves[0], meta: { score: ctx.evaluate(color), depth: 0, nodes: ctx.nodesUsed() } };
+    return {
+      move: rootMoves[0],
+      meta: {
+        score: ctx.evaluate(color), depth: 0, nodes: ctx.nodesUsed(), ttHits: ctx.ttHits(), ttCutoffs: ctx.ttCutoffs(),
+      },
+    };
   }
 
   // 一步終結偵測：任何造成對方無子可動（將死／困斃）的著法直接取用，
@@ -314,7 +548,12 @@ export function chooseMove(state, level = 6, options = {}) {
     const opponentStuck = ctx.legalMoves(other(color)).length === 0;
     ctx.unmake(move, captured);
     if (opponentStuck) {
-      return { move, meta: { score: MATE_SCORE - 1, depth: 0, nodes: ctx.nodesUsed() } };
+      return {
+        move,
+        meta: {
+          score: MATE_SCORE - 1, depth: 0, nodes: ctx.nodesUsed(), ttHits: ctx.ttHits(), ttCutoffs: ctx.ttCutoffs(),
+        },
+      };
     }
   }
 
@@ -326,7 +565,7 @@ export function chooseMove(state, level = 6, options = {}) {
     let iterationBest = null;
     let iterationBestScore = -Infinity;
     try {
-      const ordered = orderMoves(board, rootMoves.slice());
+      const ordered = ctx.orderedMoves(rootMoves.slice(), bestMove ? moveCode(bestMove) : null, 0);
       // 上一輪最佳著法排最前，加速剪枝（結果仍完全確定）。
       if (iterationBest === null && bestMove) {
         const idx = ordered.indexOf(bestMove);
@@ -381,7 +620,16 @@ export function chooseMove(state, level = 6, options = {}) {
     completedDepth = 1;
   }
 
-  return { move: bestMove, meta: { score: bestScore, depth: completedDepth, nodes: ctx.nodesUsed() } };
+  return {
+    move: bestMove,
+    meta: {
+      score: bestScore,
+      depth: completedDepth,
+      nodes: ctx.nodesUsed(),
+      ttHits: ctx.ttHits(),
+      ttCutoffs: ctx.ttCutoffs(),
+    },
+  };
 }
 
 /** 各等級參數（供 README/CLI 說明與測試）。 */

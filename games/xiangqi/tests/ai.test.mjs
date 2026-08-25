@@ -82,6 +82,32 @@ check("搜尋等級表：深度與節點預算單調不減，且夾擊範圍正�
   assert.equal(levelConfig(99).depth, levelConfig(MAX_LEVEL).depth);
 });
 
+check("L7-L10：換位表、應將靜態搜尋與資源上限皆逐級啟用", () => {
+  let previousTableSize = 0;
+  let previousQuiescence = 0;
+  for (let level = 7; level <= 10; level += 1) {
+    const cfg = levelConfig(level);
+    assert.equal(cfg.checkAwareQuiescence, true, `L${level} 應處理葉節點被將軍`);
+    assert.ok(cfg.ttEntries > previousTableSize, `L${level} 換位表容量應遞增`);
+    assert.ok(cfg.quiescence > previousQuiescence, `L${level} 靜態搜尋深度應遞增`);
+    previousTableSize = cfg.ttEntries;
+    previousQuiescence = cfg.quiescence;
+  }
+});
+
+check("L7-L10：固定局面實際命中換位表，且維持合法與確定性", () => {
+  const state = createInitialState();
+  const legal = new Set(getLegalMoves(state).map(moveKey));
+  for (let level = 7; level <= 10; level += 1) {
+    const first = chooseMove(state, level);
+    const second = chooseMove(state, level);
+    assert.ok(first.move && legal.has(moveKey(first.move)), `L${level} 必須走合法著法`);
+    assert.equal(moveKey(first.move), moveKey(second.move), `L${level} 必須可重現`);
+    assert.ok(first.meta.ttHits > 0, `L${level} 應重用換位局面`);
+    assert.ok(first.meta.ttCutoffs > 0, `L${level} 應由換位表產生剪枝`);
+  }
+});
+
 check("自我對弈煙霧測試：L3 對 L3 走 40 半回合，每步皆合法且無例外", () => {
   let state = createInitialState();
   for (let ply = 1; ply <= 40; ply += 1) {

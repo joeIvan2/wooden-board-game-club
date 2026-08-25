@@ -24,7 +24,7 @@ const LEVEL_NAMES = [
   "高手", "大師", "棋王", "超凡", "巔峰",
 ];
 const HINT_LEVEL = 6;
-const AI_THINK_MS = 2500;
+const BASE_AI_THINK_MS = 2500;
 const RECORD_KEY = "oxalpha-xiangqi-club.records.v1";
 const AUTOSAVE_KEY = "oxalpha-xiangqi-club.autosave.v1";
 const MAX_SAVED_RECORDS = 12;
@@ -83,6 +83,17 @@ function requiredElementsPresent() {
 }
 
 const colorName = (color) => (color === "red" ? "紅方" : "黑方");
+
+/**
+ * 這是防卡死保險絲，不是高階 AI 的實際節點預算。若 L7–L10 共用 2.5 秒，
+ * 較深的迭代常在完成前被截斷，實際表現便可能退回 L6 附近。
+ */
+function thinkTimeMs(solveLevel) {
+  if (solveLevel >= 10) return 6000;
+  if (solveLevel >= 9) return 4500;
+  if (solveLevel >= 7) return 3200;
+  return BASE_AI_THINK_MS;
+}
 
 function pieceLabel(piece) {
   if (!piece) return "空格";
@@ -332,11 +343,12 @@ const AiClient = (() => {
   async function fallback(solveState, solveLevel) {
     if (!localModule) localModule = import("./xiangqi-ai.mjs");
     const module = await localModule;
-    return module.chooseMove(solveState, solveLevel, { maxTimeMs: AI_THINK_MS });
+    return module.chooseMove(solveState, solveLevel, { maxTimeMs: thinkTimeMs(solveLevel) });
   }
 
   function solve(solveState, solveLevel) {
     const requestId = ++sequence;
+    const maxTimeMs = thinkTimeMs(solveLevel);
     try {
       const activeWorker = ensureWorker();
       return new Promise((resolve, reject) => {
@@ -344,13 +356,13 @@ const AiClient = (() => {
           pending.delete(requestId);
           disposeWorker();
           reject(new Error("AI 思考逾時"));
-        }, AI_THINK_MS + 15000);
+        }, maxTimeMs + 15000);
         pending.set(requestId, { resolve, reject, timer });
         activeWorker.postMessage({
           id: requestId,
           state: solveState,
           level: solveLevel,
-          options: { maxTimeMs: AI_THINK_MS },
+          options: { maxTimeMs },
         });
       });
     } catch {
