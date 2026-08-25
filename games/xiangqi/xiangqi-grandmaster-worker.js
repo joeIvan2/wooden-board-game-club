@@ -52,12 +52,13 @@ function stateToFen(state) {
 }
 
 function uciMoveToProjectMove(line) {
-  const match = /^bestmove\s+([a-i][0-9][a-i][0-9])/i.exec(line);
+  // 象棋 UCI 的橫列範圍為 1–10，因此 h10g8 這類雙位數座標是合法輸出。
+  const match = /^bestmove\s+([a-i])(10|[1-9])([a-i])(10|[1-9])/i.exec(line);
   if (!match) return null;
-  const [fromFile, fromRank, toFile, toRank] = match[1].toLowerCase();
+  const [, fromFile, fromRank, toFile, toRank] = match;
   // Fairy-Stockfish 的象棋 UCI rank 是 1–10，最高列以 0 表示；
   // 專案盤面則是 0（黑方底線）到 9（紅方底線）。
-  const toRow = (rank) => (10 - Number(rank)) % 10;
+  const toRow = (rank) => 10 - Number(rank);
   return {
     from: { row: toRow(fromRank), col: fromFile.charCodeAt(0) - 97 },
     to: { row: toRow(toRank), col: toFile.charCodeAt(0) - 97 },
