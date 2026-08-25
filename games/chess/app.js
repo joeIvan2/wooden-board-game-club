@@ -225,11 +225,20 @@ const AiClient = (() => {
     });
   }
 
+  function warm(solveLevel) {
+    try {
+      getWorker(solveLevel);
+    } catch {
+      // 正式落子時會顯示可讀的引擎錯誤；預熱不可阻斷棋盤互動。
+    }
+  }
+
   return {
     solve(solveState, solveLevel, solveContext) {
       return viaWorker(solveState, solveLevel, solveContext);
     },
     cancelAll,
+    warm,
   };
 })();
 
@@ -446,9 +455,11 @@ async function requestLevelChange(desired) {
     }
     level = desired;
     doReset();
+    AiClient.warm(level);
   } else {
     level = desired;
     stopHintComputation();
+    AiClient.warm(level);
     syncControls();
     render();
   }
@@ -1183,6 +1194,7 @@ function init() {
   refreshDerived();
   syncControls();
   render();
+  AiClient.warm(level);
 }
 
 if (document.readyState === "loading") {

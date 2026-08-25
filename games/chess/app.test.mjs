@@ -594,6 +594,7 @@ await test("clean level change invalidates hints and immediately re-renders", as
       "doReset",
       "stopHintComputation",
       "render",
+      "AiClient",
       `${src}\nreturn requestLevelChange;`
     )(
       6,
@@ -603,7 +604,8 @@ await test("clean level change invalidates hints and immediately re-renders", as
       () => calls.push("sync"),
       () => calls.push("reset"),
       () => calls.push("hintStop"),
-      () => calls.push("render")
+      () => calls.push("render"),
+      { warm: () => calls.push("warm") }
     );
 
   let calls = [];
@@ -615,6 +617,7 @@ await test("clean level change invalidates hints and immediately re-renders", as
     calls.includes("render"),
     "clean level change must render the cleared hint/status immediately"
   );
+  assert.ok(calls.includes("warm"), "selected engine should be warmed before the next move");
   assert.ok(
     calls.indexOf("hintStop") < calls.indexOf("render"),
     "the cleared state must be what gets rendered"
@@ -624,6 +627,7 @@ await test("clean level change invalidates hints and immediately re-renders", as
   calls = [];
   await build(true)(9);
   assert.ok(calls.includes("reset"));
+  assert.ok(calls.includes("warm"));
 });
 
 await test("board rendering marks hint origin/destination squares distinctly", () => {

@@ -380,7 +380,15 @@ const AiClient = (() => {
     });
   }
 
-  return { solve, cancel };
+  function warm(solveLevel) {
+    try {
+      ensureWorker(solveLevel);
+    } catch {
+      // 預熱不應阻斷棋盤；正式請求仍會將錯誤回報給玩家。
+    }
+  }
+
+  return { solve, cancel, warm };
 })();
 
 async function requestAiMove() {
@@ -613,6 +621,7 @@ function changeLevel() {
   }
   level = next;
   if (history.length) resetGameState();
+  AiClient.warm(level);
   autosaveGame();
   announce(`AI 等級調整為 L${level} ${LEVEL_NAMES[level - 1]}，新局開始。`);
   renderBoard();
@@ -996,6 +1005,7 @@ function initialise() {
     renderCaptured();
     updateControls();
   }
+  AiClient.warm(level);
   maybeTriggerAi();
 }
 
