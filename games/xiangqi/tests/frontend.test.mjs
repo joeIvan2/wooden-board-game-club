@@ -27,10 +27,8 @@ const JS_FILES = [
   "app.js",
   "serve.mjs",
   "xiangqi-rules.mjs",
-  "xiangqi-ai.mjs",
   "xiangqi-notation.mjs",
   "terminal-render.mjs",
-  "cli/xiangqi-cli.mjs",
   "tests/helpers.mjs",
   "tests/run-all.mjs",
 ];
@@ -78,9 +76,6 @@ await check("Worker 鏈：app.js 只載入 Fairy-Stockfish，且規則引擎仍�
   const worker = await readFile(join(ROOT, "..", "..", "shared", "stockfish-engine-worker.js"), "utf8");
   assert.match(worker, /UCI_Variant value \$\{game === "xiangqi" \? "xiangqi" : "chess"\}/);
   assert.match(worker, /setoption name Skill Level value/);
-  const cli = await read("cli/xiangqi-cli.mjs");
-  assert.match(cli, /from "\.\.\/xiangqi-rules\.mjs"/);
-  assert.match(cli, /from "\.\.\/xiangqi-notation\.mjs"/);
 });
 
 await check("規則引擎輸出 API 完整（規則/終局/Perft 皆可呼叫）", async () => {
@@ -98,7 +93,7 @@ await check("規則引擎輸出 API 完整（規則/終局/Perft 皆可呼叫）
 });
 
 await check("零外部連線：HTML/CSS/JS 無任何 http(s) 資源或匯入", async () => {
-  const files = ["index.html", "css/style.css", "app.js", "cli/xiangqi-cli.mjs"];
+  const files = ["index.html", "css/style.css", "app.js", "xiangqi-rules.mjs", "xiangqi-notation.mjs"];
   for (const rel of files) {
     const text = await read(rel);
     const external = text.match(/(?:src|href)="https?:|url\(\s*["']?https?:|from\s+["']https?:/);
@@ -146,12 +141,13 @@ await check("棋盤格線完整且疊在木紋上、互動格下", async () => {
   assert.match(rule("\\.board-square"), /z-index:\s*2/);
 });
 
-await check("README 涵蓋啟動、CLI、測試與 AI 等級說明", async () => {
+await check("README 涵蓋啟動、測試與 AI 等級說明", async () => {
   const readme = await read("README.md");
   assert.match(readme, /serve\.mjs/);
-  assert.match(readme, /tournament/);
   assert.match(readme, /npm (run )?test|node tests\/run-all\.mjs/);
   assert.match(readme, /L10/);
+  assert.match(readme, /Fairy-Stockfish/);
+  assert.doesNotMatch(readme, /xiangqi-cli|自研.*AI|確定性 AI/);
 });
 
 console.log(`\nfrontend：${passed} 項全數通過`);

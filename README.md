@@ -54,7 +54,7 @@ npm run build
 
 西洋棋與中國象棋的 **L1–L10 和提示** 都在瀏覽器內使用本機隨附的 Fairy-Stockfish NNUE WebAssembly，分別以 chess / xiangqi UCI 變體分析；五子棋的 **L1–L10** 都使用本機隨附的 Rapfi WebAssembly。三者的局面都不會送到伺服器。
 
-每個等級只改變同一引擎的強度、深度與思考時間；沒有載入舊的瀏覽器搜尋演算法，也不會在引擎失敗時偷偷代下一手。引擎輸出一律回到各遊戲的規則引擎核對合法著法後才會套用。
+每個等級只改變同一引擎的強度、深度與思考時間；引擎失敗會直接回報，不會由其他來源代下一手。引擎輸出一律回到各遊戲的規則引擎核對合法著法後才會套用。
 
 因為隨附 GPL-3.0 的引擎物件碼，整個專案以 **GPL-3.0-or-later** 提供；完整條文在 [LICENSE](LICENSE)，上游版本、對應原始碼與來源連結見 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 

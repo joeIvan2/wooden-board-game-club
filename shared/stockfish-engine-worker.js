@@ -3,7 +3,7 @@
  *
  * This deliberately owns only engine protocol/FEN conversion.  Every returned
  * coordinate is matched against the product's own rules engine in app.js
- * before it can alter a game.  There is no local-search fallback path.
+ * before it can alter a game. An engine error is returned to the game UI.
  */
 
 const VENDOR_DIR = "../games/xiangqi/vendor/fairy-stockfish-nnue-1.1.11/";

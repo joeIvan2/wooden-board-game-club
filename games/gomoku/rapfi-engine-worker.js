@@ -1,7 +1,7 @@
 /*
  * Rapfi classic WebAssembly bridge for the fixed 15x15 freestyle game.
- * The product intentionally bundles one pinned engine build: no browser
- * capability switch and no fallback to the retired V4 search implementation.
+ * The product intentionally bundles one pinned engine build; an engine error
+ * is reported to the UI instead of sourcing a move elsewhere.
  */
 
 const VENDOR_DIR = "./vendor/rapfi-classic-0.43.02/";

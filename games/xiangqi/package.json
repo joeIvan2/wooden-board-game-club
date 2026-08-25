@@ -1,12 +1,11 @@
 {
   "name": "oxalpha-xiangqi-club",
   "version": "1.0.0",
-  "description": "楚河漢界 · 象棋衝鋒社：純本機、零套件依賴的中國象棋 web 產品（規則引擎 + L1-L10 確定性 AI + CLI + 無障礙 UI）",
+  "description": "楚河漢界 · 象棋衝鋒社：純本機中國象棋 web 產品（規則引擎 + Fairy-Stockfish L1-L10 + 無障礙 UI）",
   "type": "module",
   "private": true,
   "scripts": {
     "start": "node serve.mjs",
-    "cli": "node cli/xiangqi-cli.mjs",
     "test": "node tests/run-all.mjs"
   },
   "engines": {

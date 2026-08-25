@@ -1,6 +1,5 @@
-// Difficulty labels for the one bundled Rapfi engine.  The browser no longer
-// loads the retired V4 search; every level maps to Rapfi in the worker and
-// differs only in that engine's fixed strength/time/depth profile.
+// Difficulty labels for the one bundled Rapfi engine. Every level maps to
+// Rapfi in the worker and differs only in its fixed strength/time/depth profile.
 export const AI_ENGINE_VERSION = "Rapfi-classic-0.43.02";
 
 const names = [
