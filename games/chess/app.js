@@ -55,6 +55,12 @@ let recordPromptedThisGame = false;
 let leaderboard = null;
 const sqButtons = [];
 
+function engineThinkTimeMs(solveLevel) {
+  const budgets = [250, 350, 500, 700, 950, 1300, 1800, 2600, 3800, 5600];
+  const index = Math.max(1, Math.min(10, Math.trunc(Number(solveLevel) || 1))) - 1;
+  return budgets[index];
+}
+
 function buildLevelSelect() {
   for (let l = 1; l <= 10; l++) {
     const opt = document.createElement("option");
@@ -128,10 +134,8 @@ function buildBoard() {
 
 const AiClient = (() => {
   let worker = null;
-  let workerBroken = false;
   let seq = 0;
   const pending = new Map();
-  let localModulePromise = null;
 
   function dropWorker() {
     if (worker) {
@@ -166,14 +170,12 @@ const AiClient = (() => {
   }
 
   function getWorker() {
-    if (workerBroken) return null;
     if (worker) return worker;
     try {
-      worker = new Worker(new URL("./chess-ai-worker.mjs", import.meta.url), {
-        type: "module",
-      });
+      worker = new Worker(new URL("../../shared/stockfish-engine-worker.js", import.meta.url));
       worker.addEventListener("message", (event) => {
         const data = event.data || {};
+        if (data.type === "ready") return;
         const entry = pending.get(data.id);
         if (!entry) return;
         pending.delete(data.id);
@@ -182,14 +184,12 @@ const AiClient = (() => {
         else entry.reject(new Error(data.error || "worker 回傳失敗"));
       });
       worker.addEventListener("error", () => {
-        workerBroken = true;
         dropWorker();
-        failAllPending("AI worker 發生錯誤");
+        failAllPending("Fairy-Stockfish worker 發生錯誤");
       });
       return worker;
-    } catch {
-      workerBroken = true;
-      return null;
+    } catch (error) {
+      throw new Error(`無法建立 Fairy-Stockfish worker：${error?.message || error}`);
     }
   }
 
@@ -198,33 +198,27 @@ const AiClient = (() => {
     if (!w) return Promise.reject(new Error("無法建立 AI worker"));
     return new Promise((resolve, reject) => {
       const id = ++seq;
+      const maxTimeMs = engineThinkTimeMs(solveLevel);
       const timer = setTimeout(() => {
         pending.delete(id);
         dropWorker();
-        reject(new Error("AI worker 逾時"));
-      }, 60000);
+        reject(new Error("Fairy-Stockfish 思考逾時"));
+      }, maxTimeMs + 25000);
       pending.set(id, { resolve, reject, timer });
       w.postMessage({
         id,
+        game: "chess",
         state: solveState,
         level: solveLevel,
+        maxTimeMs,
         context: solveContext || {},
       });
     });
   }
 
-  async function viaLocal(solveState, solveLevel, solveContext) {
-    if (!localModulePromise) localModulePromise = import("./chess-ai.mjs");
-    const mod = await localModulePromise;
-    return mod.chooseMove(solveState, solveLevel, solveContext || {});
-  }
-
   return {
     solve(solveState, solveLevel, solveContext) {
-      return viaWorker(solveState, solveLevel, solveContext).catch((err) => {
-        if (err && err.cancelled) throw err;
-        return viaLocal(solveState, solveLevel, solveContext);
-      });
+      return viaWorker(solveState, solveLevel, solveContext);
     },
     cancelAll,
   };
@@ -382,17 +376,13 @@ function startAiTurn() {
     (move) => {
       if (gen !== gameGeneration || reqId !== aiRequestSeq) return;
       aiBusy = false;
-      if (!move) {
-        const fallback = posLegal[0];
-        if (fallback) {
-          executeMove({ ...fallback, __fromAi: true });
-          flashNotice("AI 未回傳著法，已改用備援著法。");
-        } else {
-          render();
-        }
+      const legalMove = move && posLegal.find((candidate) => sameMoveShape(candidate, move));
+      if (!legalMove) {
+        render();
+        flashNotice("Fairy-Stockfish 未回傳合法著法；請重新開始本局。");
         return;
       }
-      executeMove({ ...move, __fromAi: true });
+      executeMove({ ...legalMove, __fromAi: true });
     },
     (err) => {
       if (gen !== gameGeneration || reqId !== aiRequestSeq) return;

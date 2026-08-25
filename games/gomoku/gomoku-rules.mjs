@@ -1,14 +1,56 @@
-// Pure Gomoku rule helpers shared by the headless arena and tactical tests.
+// Pure Gomoku rule helpers shared by the browser and headless arena.
 // Board values are 0 (empty), 1 (black), and 2 (white); five or more wins.
-import {
-  BOARD_SIZE,
-  CELLS,
-  flattenBoard,
-  winsAt,
-  candidateMoves,
-} from './gomoku-ai-v4-core.mjs';
+// It intentionally does not import an AI module, so the game UI can load only
+// the pinned Rapfi engine rather than the retired V4 search implementation.
+export const BOARD_SIZE = 15;
+export const CELLS = BOARD_SIZE * BOARD_SIZE;
 
-export { BOARD_SIZE, CELLS };
+function flattenBoard(inputBoard) {
+  if (!Array.isArray(inputBoard)) return null;
+  if (inputBoard.length === CELLS && !inputBoard.some(Array.isArray)) return [...inputBoard];
+  if (inputBoard.length !== BOARD_SIZE || inputBoard.some((row) => !Array.isArray(row) || row.length !== BOARD_SIZE)) {
+    return null;
+  }
+  return inputBoard.flat();
+}
+
+function winsAt(board, index, player) {
+  const row = Math.floor(index / BOARD_SIZE);
+  const col = index % BOARD_SIZE;
+  for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+    let count = 1;
+    for (const direction of [-1, 1]) {
+      let r = row + dr * direction;
+      let c = col + dc * direction;
+      while (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r * BOARD_SIZE + c] === player) {
+        count += 1;
+        r += dr * direction;
+        c += dc * direction;
+      }
+    }
+    if (count >= 5) return true;
+  }
+  return false;
+}
+
+function candidateMoves(board, radius = 2) {
+  const candidates = new Set();
+  for (let index = 0; index < CELLS; index += 1) {
+    if (board[index] === 0) continue;
+    const row = Math.floor(index / BOARD_SIZE);
+    const col = index % BOARD_SIZE;
+    for (let dr = -radius; dr <= radius; dr += 1) {
+      for (let dc = -radius; dc <= radius; dc += 1) {
+        const r = row + dr;
+        const c = col + dc;
+        if (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r * BOARD_SIZE + c] === 0) {
+          candidates.add(r * BOARD_SIZE + c);
+        }
+      }
+    }
+  }
+  return [...candidates];
+}
 
 export function createBoard() {
   return Array(CELLS).fill(0);

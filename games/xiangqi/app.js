@@ -84,10 +84,7 @@ function requiredElementsPresent() {
 
 const colorName = (color) => (color === "red" ? "紅方" : "黑方");
 
-/**
- * 這是防卡死保險絲，不是高階 AI 的實際節點預算。若 L7–L10 共用 2.5 秒，
- * 較深的迭代常在完成前被截斷，實際表現便可能退回 L6 附近。
- */
+/** 每一級都交給同一個本機 Fairy-Stockfish 引擎；只調整思考時間。 */
 function thinkTimeMs(solveLevel) {
   if (solveLevel >= 10) return 6000;
   if (solveLevel >= 9) return 4500;
@@ -292,149 +289,80 @@ function onSquareKeydown(event) {
 
 const AiClient = (() => {
   let worker = null;
-  let grandmasterWorker = null;
-  let localModule = null;
   let sequence = 0;
   const pending = new Map();
-  const grandmasterPending = new Map();
 
-  function disposeSearchWorker() {
+  function disposeWorker() {
     if (worker) {
       worker.terminate();
       worker = null;
     }
   }
 
-  function disposeGrandmasterWorker() {
-    if (grandmasterWorker) {
-      grandmasterWorker.terminate();
-      grandmasterWorker = null;
-    }
-  }
-
-  function rejectPending(jobs, error) {
-    for (const { reject, timer } of jobs.values()) {
+  function rejectPending(error) {
+    for (const { reject, timer } of pending.values()) {
       clearTimeout(timer);
       reject(error);
     }
-    jobs.clear();
+    pending.clear();
   }
 
   function cancel() {
     sequence += 1;
     const error = new Error("AI 計算已取消");
     error.cancelled = true;
-    rejectPending(pending, error);
-    rejectPending(grandmasterPending, error);
-    disposeSearchWorker();
-    disposeGrandmasterWorker();
+    rejectPending(error);
+    disposeWorker();
   }
 
-  function failSearch(error) {
-    rejectPending(pending, error);
-    disposeSearchWorker();
-  }
-
-  function failGrandmaster(error) {
-    rejectPending(grandmasterPending, error);
-    disposeGrandmasterWorker();
+  function fail(error) {
+    rejectPending(error);
+    disposeWorker();
   }
 
   function ensureWorker() {
     if (worker) return worker;
-    worker = new Worker(new URL("./xiangqi-ai-worker.mjs", import.meta.url), { type: "module" });
+    worker = new Worker(new URL("../../shared/stockfish-engine-worker.js", import.meta.url));
     worker.addEventListener("message", (event) => {
       const message = event.data || {};
+      if (message.type === "ready") return;
       const job = pending.get(message.id);
       if (!job) return;
       pending.delete(message.id);
       clearTimeout(job.timer);
       if (message.ok) job.resolve(message.move);
-      else job.reject(new Error(message.error || "AI 無法計算著法"));
+      else job.reject(new Error(message.error || "引擎無法計算著法"));
     });
-    worker.addEventListener("error", () => failSearch(new Error("AI worker 發生錯誤")));
+    worker.addEventListener("error", (event) => {
+      const detail = event?.message ? `：${event.message}` : "";
+      fail(new Error(`Fairy-Stockfish worker 發生錯誤${detail}`));
+    });
     return worker;
   }
 
-  function ensureGrandmasterWorker() {
-    if (grandmasterWorker) return grandmasterWorker;
-    grandmasterWorker = new Worker(new URL("./xiangqi-grandmaster-worker.js", import.meta.url));
-    grandmasterWorker.addEventListener("message", (event) => {
-      const message = event.data || {};
-      if (message.type === "ready") return;
-      const job = grandmasterPending.get(message.id);
-      if (!job) return;
-      grandmasterPending.delete(message.id);
-      clearTimeout(job.timer);
-      if (message.ok) job.resolve(message.move);
-      else job.reject(new Error(message.error || "巔峰引擎無法計算著法"));
-    });
-    grandmasterWorker.addEventListener("error", (event) => {
-      const detail = event?.message ? `：${event.message}` : "";
-      failGrandmaster(new Error(`巔峰引擎 worker 發生錯誤${detail}`));
-    });
-    return grandmasterWorker;
-  }
-
-  async function fallback(solveState, solveLevel) {
-    if (!localModule) localModule = import("./xiangqi-ai.mjs");
-    const module = await localModule;
-    return module.chooseMove(solveState, solveLevel, { maxTimeMs: thinkTimeMs(solveLevel) }).move;
-  }
-
-  function solveSearch(solveState, solveLevel) {
+  function solve(solveState, solveLevel) {
     const requestId = ++sequence;
     const maxTimeMs = thinkTimeMs(solveLevel);
-    try {
-      const activeWorker = ensureWorker();
-      return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
+      try {
+        const activeWorker = ensureWorker();
         const timer = setTimeout(() => {
           pending.delete(requestId);
-          disposeSearchWorker();
-          reject(new Error("AI 思考逾時"));
-        }, maxTimeMs + 15000);
+          disposeWorker();
+          reject(new Error("Fairy-Stockfish 思考逾時"));
+        }, maxTimeMs + 25000);
         pending.set(requestId, { resolve, reject, timer });
         activeWorker.postMessage({
           id: requestId,
+          game: "xiangqi",
           state: solveState,
           level: solveLevel,
-          options: { maxTimeMs },
+          maxTimeMs,
         });
-      });
-    } catch {
-      return fallback(solveState, solveLevel);
-    }
-  }
-
-  function solveGrandmaster(solveState) {
-    const requestId = ++sequence;
-    const maxTimeMs = thinkTimeMs(10);
-    try {
-      const activeWorker = ensureGrandmasterWorker();
-      return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => {
-          grandmasterPending.delete(requestId);
-          disposeGrandmasterWorker();
-          reject(new Error("巔峰引擎思考逾時"));
-        }, maxTimeMs + 25000);
-        grandmasterPending.set(requestId, { resolve, reject, timer });
-        activeWorker.postMessage({ id: requestId, state: solveState, maxTimeMs });
-      });
-    } catch (error) {
-      return Promise.reject(error);
-    }
-  }
-
-  function solve(solveState, solveLevel) {
-    if (solveLevel >= 10) {
-      return solveGrandmaster(solveState).catch((error) => {
-        if (error?.cancelled) throw error;
-        // 不支援 SharedArrayBuffer／WASM threads 的環境仍可安全退回原 L10 搜尋。
-        console.warn("L10 巔峰引擎無法啟動，已安全退回本機搜尋。", error);
-        return fallback(solveState, solveLevel);
-      });
-    }
-    return solveSearch(solveState, solveLevel);
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
   return { solve, cancel };
@@ -445,7 +373,7 @@ async function requestAiMove() {
   const generation = ++aiGeneration;
   aiBusy = true;
   updateControls();
-  announce(level >= 10 ? "L10 巔峰引擎正在研判局勢…" : `L${level} AI 正在研判局勢…`);
+  announce(`L${level} Fairy-Stockfish 正在研判局勢…`);
   try {
     const move = await AiClient.solve(state, level);
     if (generation !== aiGeneration || gameFinished || mode !== "ai" || state.turn !== "black") return;
@@ -482,9 +410,11 @@ async function showHint() {
   try {
     const move = await AiClient.solve(state, HINT_LEVEL);
     if (generation !== aiGeneration || !move) return;
-    hintMove = move;
+    const legalMove = getLegalMoves(state).find((candidate) => isSameMove(candidate, move));
+    if (!legalMove) throw new Error("引擎回傳了不合法提示");
+    hintMove = legalMove;
     hintUsedThisGame = true;
-    announce(`建議：${formatChineseMove(state, move)}（${formatCoordinateMove(move)}），虛線標示起訖。`);
+    announce(`建議：${formatChineseMove(state, legalMove)}（${formatCoordinateMove(legalMove)}），虛線標示起訖。`);
   } catch (error) {
     if (!error?.cancelled) announce("提示分析未完成，請稍後重試。", true);
   } finally {

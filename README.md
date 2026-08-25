@@ -40,7 +40,7 @@ npm start
 npm test
 ```
 
-測試涵蓋平台 UI contract、五子棋 V4/L1–L10、三款棋規則與 AI。
+測試涵蓋平台 UI contract、三款棋的規則、棋譜與本機引擎接線。
 
 ## 建置
 
@@ -50,9 +50,11 @@ npm run build
 
 `dist/` 只包含瀏覽器必要資產，不含測試、CLI 或設計文件，可直接交給 Cloudflare Pages。
 
-## L10 巔峰引擎與授權
+## 本機棋力引擎與授權
 
-中國象棋 L10 在瀏覽器內使用本機隨附的 Fairy-Stockfish NNUE WebAssembly，透過 UCI 的象棋變體分析局面；棋局不會送到伺服器。L1–L9 與提示則維持專案內原本可重現的搜尋引擎。若瀏覽器不支援 WASM threads 或 cross-origin isolation，L10 會安全退回本機搜尋，且所有引擎輸出都必須再次通過專案規則引擎的合法著法檢查。
+西洋棋與中國象棋的 **L1–L10 和提示** 都在瀏覽器內使用本機隨附的 Fairy-Stockfish NNUE WebAssembly，分別以 chess / xiangqi UCI 變體分析；五子棋的 **L1–L10** 都使用本機隨附的 Rapfi WebAssembly。三者的局面都不會送到伺服器。
+
+每個等級只改變同一引擎的強度、深度與思考時間；沒有載入舊的瀏覽器搜尋演算法，也不會在引擎失敗時偷偷代下一手。引擎輸出一律回到各遊戲的規則引擎核對合法著法後才會套用。
 
 因為隨附 GPL-3.0 的引擎物件碼，整個專案以 **GPL-3.0-or-later** 提供；完整條文在 [LICENSE](LICENSE)，上游版本、對應原始碼與來源連結見 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
@@ -71,8 +73,9 @@ npx wrangler pages deploy dist --project-name wooden-board-game-club
 - `shared/game-registry.mjs`：三款遊戲的穩定識別與路由。
 - `shared/match-adapter.mjs`：目前使用 `LocalMatchAdapter`；未來遠端 transport 從同一介面接入。
 - `shared/leaderboard.mjs`：三款遊戲共用的勝局登記、L6–L10 篩選與排行榜畫面。
-- `games/gomoku/`：全新 DOM/SVG 2D 棋盤，沿用既有 V4 AI。
-- `games/chess/`：沿用完整西洋棋規則與 AI，套用平台殼層。
-- `games/xiangqi/`：沿用完整中國象棋規則與 AI，套用平台殼層。
+- `shared/stockfish-engine-worker.js`：西洋棋／中國象棋共用的本機 Fairy-Stockfish UCI 橋接。
+- `games/gomoku/`：全新 DOM/SVG 2D 棋盤與 Rapfi WebAssembly 橋接。
+- `games/chess/`：完整西洋棋規則、棋譜與原木平台殼層。
+- `games/xiangqi/`：完整中國象棋規則、棋譜與原木平台殼層。
 
 現階段沒有啟用線上配對、房間或 WebSocket，介面會明確顯示「本機對局」；排行榜則透過 Pages Functions 與 D1 提供。

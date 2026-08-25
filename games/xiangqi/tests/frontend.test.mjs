@@ -2,7 +2,7 @@
  * tests/frontend.test.mjs — 前端語法與結構測試：
  * 1) 所有 JS 以 node --check 驗證語法（ESM）。
  * 2) index.html 具備 app.js 所需的全部元素 id。
- * 3) Worker 與 CLI 確實共用同一套規則/AI 模組。
+ * 3) 瀏覽器只使用本機隨附的 Fairy-Stockfish，並保留規則合法著法防線。
  * 4) 無任何外部網路資源引用（零連線）。
  * 5) CSS 具備 reduced-motion、focus-visible、44px 觸控目標與響應式。
  */
@@ -30,7 +30,6 @@ const JS_FILES = [
   "xiangqi-ai.mjs",
   "xiangqi-notation.mjs",
   "terminal-render.mjs",
-  "xiangqi-ai-worker.mjs",
   "cli/xiangqi-cli.mjs",
   "tests/helpers.mjs",
   "tests/run-all.mjs",
@@ -72,15 +71,15 @@ await check("HTML 基本結構：module script、樣式表、語言、視口、�
   assert.match(html, /class="skip-link"/);
 });
 
-await check("Worker 鏈：app.js 以 module Worker 載入 worker，worker 與 CLI 共用規則/AI", async () => {
-  assert.match(appJs, /new Worker\(new URL\("\.\/xiangqi-ai-worker\.mjs", import\.meta\.url\), \{ type: "module" \}\)/);
-  const worker = await read("xiangqi-ai-worker.mjs");
-  assert.match(worker, /from "\.\/xiangqi-ai\.mjs"/);
-  const ai = await read("xiangqi-ai.mjs");
-  assert.match(ai, /from "\.\/xiangqi-rules\.mjs"/);
+await check("Worker 鏈：app.js 只載入 Fairy-Stockfish，且規則引擎仍核對回傳著法", async () => {
+  assert.match(appJs, /new Worker\(new URL\("\.\.\/\.\.\/shared\/stockfish-engine-worker\.js", import\.meta\.url\)\)/);
+  assert.doesNotMatch(appJs, /xiangqi-ai-worker|xiangqi-ai\.mjs|fallback/);
+  assert.match(appJs, /getLegalMoves\(state\)\.find\(\(candidate\) => isSameMove\(candidate, move\)\)/);
+  const worker = await readFile(join(ROOT, "..", "..", "shared", "stockfish-engine-worker.js"), "utf8");
+  assert.match(worker, /UCI_Variant value \$\{game === "xiangqi" \? "xiangqi" : "chess"\}/);
+  assert.match(worker, /setoption name Skill Level value/);
   const cli = await read("cli/xiangqi-cli.mjs");
   assert.match(cli, /from "\.\.\/xiangqi-rules\.mjs"/);
-  assert.match(cli, /from "\.\.\/xiangqi-ai\.mjs"/);
   assert.match(cli, /from "\.\.\/xiangqi-notation\.mjs"/);
 });
 
@@ -99,7 +98,7 @@ await check("規則引擎輸出 API 完整（規則/終局/Perft 皆可呼叫）
 });
 
 await check("零外部連線：HTML/CSS/JS 無任何 http(s) 資源或匯入", async () => {
-  const files = ["index.html", "css/style.css", "app.js", "xiangqi-ai-worker.mjs", "cli/xiangqi-cli.mjs"];
+  const files = ["index.html", "css/style.css", "app.js", "cli/xiangqi-cli.mjs"];
   for (const rel of files) {
     const text = await read(rel);
     const external = text.match(/(?:src|href)="https?:|url\(\s*["']?https?:|from\s+["']https?:/);

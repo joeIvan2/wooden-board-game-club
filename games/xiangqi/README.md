@@ -1,6 +1,6 @@
 # 楚河漢界 · 象棋衝鋒社
 
-純本機、**零套件依賴**的中國象棋 web 產品。規則引擎、L1–L10 確定性 AI、命令列對弈與瀏覽器介面共用同一套原生 ES Modules；所有棋局與私人棋譜只存在你自己的裝置，沒有任何連線。
+純本機的中國象棋 web 產品。瀏覽器的 L1–L10 與提示使用本機隨附的 Fairy-Stockfish NNUE WebAssembly；規則引擎與棋譜工具仍由原生 ES Modules 提供。所有棋局與私人棋譜只存在你自己的裝置，沒有任何連線。
 
 ## 快速開始
 
@@ -18,26 +18,13 @@ npm test                  # 執行全部 Node assert 測試
 - **模式**：人機對弈（玩家執紅）與雙人對戰；點擊或全鍵盤操作（方向鍵移動游標、Enter 選子／落子、Esc 取消）。
 - **對局工具**：新局、悔棋（人機模式自動退回己方回合）、翻面、提示（AI 建議著法）、中文縱線記法棋譜＋座標記法、被吃子力統計、終局面板。
 - **隱私**：進度自動存於 `localStorage`，可手動存檔／讀檔；「下載棋譜」以 Blob 在本機產生純文字檔，不上傳任何資料。
-- **AI L1–L10**：迭代加深 alpha-beta、MVV-LVA 排序、吃子靜態搜尋、節點預算制——同輸入必得同輸出（deterministic）。在瀏覽器中以 Module Worker 計算，不凍結 UI。
+- **AI L1–L10**：所有等級與提示都由本機 Fairy-Stockfish NNUE WebAssembly 計算；只調整 UCI Skill Level 與思考時間。引擎失敗時不會改用另一套演算法或代下一手。
 - **無障礙**：ARIA grid/label、`aria-live` 播報、roving tabindex、`:focus-visible` 高對比焦點、≥44px 觸控目標、`prefers-reduced-motion` 支援。
 - **視覺**：深墨胡桃木主題、朱紅／墨玉棋子、楚河漢界河界與九宮斜線（內嵌 SVG）、桌面雙欄＋手機單欄響應式。
 
 ## AI 等級
 
-| 等級 | 深度 | 靜態搜尋 | 節點預算 |
-|------|------|----------|----------|
-| L1 初學 | 1 | 0 | 2,000 |
-| L2 入門 | 1 | 0 | 6,000 |
-| L3 業餘 | 2 | 0 | 20,000 |
-| L4 進階 | 2 | 4 | 45,000 |
-| L5 好手 | 3 | 4 | 90,000 |
-| L6 高手 | 3 | 6 | 160,000 |
-| L7 大師 | 4 | 6 | 260,000 |
-| L8 棋王 | 4 | 8 | 420,000 |
-| L9 超凡 | 5 | 8 | 650,000 |
-| L10 巔峰 | 6 | 10 | 900,000 |
-
-L1–L2 僅物質評估；L3 起加入位置加權。搜尋以「節點數」為主要預算，因此結果跨機器一致；瀏覽器端另有時間保險絲避免極端等待。
+L1–L10 都採用同一個本機 Fairy-Stockfish 引擎，對應遞增的 UCI Skill Level（0 至 20）與思考時間。所有著法會由 `xiangqi-rules.mjs` 再次核對，任何不合法回傳都不會套用。
 
 ## CLI（共用同一套規則／AI 模組）
 
@@ -68,9 +55,8 @@ node tests/frontend.test.mjs          # 前端語法(node --check)與結構(id/W
 | 檔案 | 職責 |
 |------|------|
 | `xiangqi-rules.mjs` | 規則引擎（純資料、無 DOM/IO）：著法產生、合法性、將軍/將死/困斃、Perft |
-| `xiangqi-ai.mjs` | L1–L10 確定性搜尋（迭代加深 alpha-beta + quiescence + 節點預算） |
 | `xiangqi-notation.mjs` | 中文縱線記法與座標記法互轉、解析 |
-| `xiangqi-ai-worker.mjs` | Module Worker 包裝層 |
+| `../../shared/stockfish-engine-worker.js` | Fairy-Stockfish UCI Worker（西洋棋／中國象棋共用） |
 | `app.js` / `index.html` / `css/style.css` | 瀏覽器 UI（渲染、鍵盤、存檔、下載、ARIA） |
 | `serve.mjs` | 零依賴靜態伺服器 |
 | `cli/xiangqi-cli.mjs` | play / tournament CLI |
@@ -80,8 +66,7 @@ node tests/frontend.test.mjs          # 前端語法(node --check)與結構(id/W
 ## 已知限制
 
 - 未裁決長將／長捉等重複局面規則（無三次重複自動和局）。
-- 靜態搜尋僅考慮吃子，被將軍時不以全部應將著法展開，極少數殘局會低估被將死分數。
-- L10 在中局最壞情況可能需要數秒；瀏覽器端有時間保險絲，CLI/測試維持嚴格決定性。
+- 高等級在中局最壞情況可能需要數秒；瀏覽器端有時間保險絲，逾時時會明確要求重開，不會暗中換用另一套 AI。
 - 同線超過三枚兵的記法前綴採數字約定，非正式比賽用語。
 - 不支援匯入 FEN／外部棋譜格式。
 

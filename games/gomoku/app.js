@@ -1,5 +1,5 @@
 import { BOARD_SIZE, CELLS, createBoard, applyMove, moveToIndex, isBoardFull } from "./gomoku-rules.mjs";
-import { AI_LEVELS } from "./gomoku-levels.mjs";
+import { AI_LEVELS } from "./gomoku-engine-levels.mjs";
 import { createMatchAdapter } from "../../shared/match-adapter.mjs";
 import { createLeaderboardController, isLeaderboardLevel } from "../../shared/leaderboard.mjs";
 
@@ -142,7 +142,7 @@ function renderStatus(message = "") {
   els.thinking.hidden = !aiBusy;
   els.undo.disabled = aiBusy || history.length === 0;
   els.level.disabled = mode !== "ai" || aiBusy;
-  const status = message || (aiBusy ? `L${level} 正在選擇落點…` : `${playerName(currentPlayer)}行棋。`);
+  const status = message || (aiBusy ? `L${level} Rapfi 正在選擇落點…` : `${playerName(currentPlayer)}行棋。`);
   els.status.textContent = status;
   els.live.textContent = status;
 }
@@ -243,7 +243,7 @@ function onBoardPointerCancel(event) {
 }
 
 function ensureWorker() {
-  if (!worker) worker = new Worker(new URL("./ai-worker.mjs", import.meta.url), { type: "module" });
+  if (!worker) worker = new Worker(new URL("./rapfi-engine-worker.js", import.meta.url));
   return worker;
 }
 
@@ -262,12 +262,13 @@ function requestAiMove() {
     const index = moveToIndex(data.move);
     if (!gameOver && currentPlayer === 2 && board[index] === 0) finishMove(index, 2);
   };
-  currentWorker.onerror = () => {
+  currentWorker.onerror = (event) => {
     if (id !== aiRequestId) return;
     aiBusy = false;
-    render("AI Worker 發生錯誤，請重新開始本局。");
+    const detail = event?.message ? `：${event.message}` : "";
+    render(`Rapfi 引擎發生錯誤${detail}，請重新開始本局。`);
   };
-  currentWorker.postMessage({ id, board: [...board], player: 2, level });
+  currentWorker.postMessage({ id, board: [...board], level });
 }
 
 function cancelAi() {

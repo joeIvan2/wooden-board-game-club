@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 const appPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "app.js");
 const appSrc = await readFile(appPath, "utf8");
 const workerSrc = await readFile(
-  path.join(path.dirname(fileURLToPath(import.meta.url)), "chess-ai-worker.mjs"),
+  path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "shared", "stockfish-engine-worker.js"),
   "utf8"
 );
 const htmlSrc = await readFile(
@@ -226,6 +226,7 @@ const buildAiClient = new Function(
   "__workerBaseUrl",
   "setTimeout",
   "clearTimeout",
+  "engineThinkTimeMs",
   `${aiClientPatched}\nreturn AiClient;`
 );
 
@@ -234,7 +235,7 @@ function freshAiClient() {
   FakeWorker.nextAutoReply = null;
   timersIssued = 0;
   timersCleared.length = 0;
-  return buildAiClient(FakeWorker, URL, "file:///fake/app.js", spySetTimeout, spyClearTimeout);
+  return buildAiClient(FakeWorker, URL, "file:///fake/app.js", spySetTimeout, spyClearTimeout, () => 1000);
 }
 
 const AI_STATE = { board: [], turn: "b" };
@@ -349,8 +350,9 @@ await test("controller wiring: doReset cancels in-flight AI work", () => {
 
 // ---------- 特殊和棋規則：控制器接線與純邏輯 ----------
 
-await test("worker protocol forwards repetition context into chooseMove", () => {
-  assert.match(workerSrc, /chooseMove\(data\.state,\s*data\.level,\s*data\.context/);
+await test("worker protocol pins the local Stockfish chess variant and difficulty setting", () => {
+  assert.match(workerSrc, /UCI_Variant value \$\{game === "xiangqi" \? "xiangqi" : "chess"\}/);
+  assert.match(workerSrc, /setoption name Skill Level value/);
 });
 
 await test("reset wiring keeps tracker lifecycle and cancels in-flight AI work", () => {
