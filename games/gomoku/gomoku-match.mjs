@@ -68,8 +68,8 @@ export function playGame(options = {}) {
     opening: true,
   }));
   const diagnostics = {
-    black: { nodes: 0, elapsedMs: 0, timedOut: 0, searches: 0 },
-    white: { nodes: 0, elapsedMs: 0, timedOut: 0, searches: 0 },
+    black: { nodes: 0, elapsedMs: 0, timedOut: 0, searches: 0, totalDepth: 0, minDepth: null, maxDepth: 0 },
+    white: { nodes: 0, elapsedMs: 0, timedOut: 0, searches: 0, totalDepth: 0, minDepth: null, maxDepth: 0 },
   };
   const maxPlies = options.maxPlies ?? board.length;
   let player = 1;
@@ -99,6 +99,10 @@ export function playGame(options = {}) {
     bucket.nodes += Number(info.nodes) || 0;
     bucket.elapsedMs += Number(info.elapsedMs) || 0;
     bucket.searches++;
+    const depth = Number(info.depth) || 0;
+    bucket.totalDepth += depth;
+    bucket.minDepth = bucket.minDepth === null ? depth : Math.min(bucket.minDepth, depth);
+    bucket.maxDepth = Math.max(bucket.maxDepth, depth);
     if (info.timedOut) bucket.timedOut++;
 
     let index;
@@ -184,4 +188,3 @@ export function playGame(options = {}) {
 }
 
 export default { playGame };
-

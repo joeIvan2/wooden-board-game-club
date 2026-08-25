@@ -17,23 +17,39 @@ import {
 } from "../../shared/paired-level-tournament.mjs";
 
 export const CHESS_ENGINE_TIMES_MS = Object.freeze({
-  l6: 1300,
-  l7: 1800,
-  l8: 2600,
-  l9: 3800,
-  l10: 5600,
+  l6: 1500,
+  l7: 2300,
+  l8: 3400,
+  l9: 5000,
+  l10: 7200,
 });
 
-// Fixed, legal, balanced opening positions.  Each entry has an even number of
-// plies, so white is always to move when the paired game begins.
-const OPENING_BOOK = Object.freeze([
-  Object.freeze({ id: "open-game", moves: Object.freeze(["e2e4", "e7e5", "g1f3", "b8c6"]) }),
-  Object.freeze({ id: "queens-gambit", moves: Object.freeze(["d2d4", "d7d5", "c2c4", "e7e6"]) }),
-  Object.freeze({ id: "sicilian", moves: Object.freeze(["e2e4", "c7c5", "g1f3", "d7d6"]) }),
-  Object.freeze({ id: "english", moves: Object.freeze(["c2c4", "e7e5", "b1c3", "g8f6"]) }),
-  Object.freeze({ id: "indian", moves: Object.freeze(["d2d4", "g8f6", "c2c4", "e7e6"]) }),
-  Object.freeze({ id: "reti", moves: Object.freeze(["g1f3", "d7d5", "c2c4", "d5d4"]) }),
+// Fixed, legal opening positions. Each line has an even number of plies, so
+// white is to move when the paired game begins. They are deliberately deeper
+// than a four-ply opening: an audit needs varied middlegame decisions rather
+// than repeated engine draws from near-initial symmetry.
+export const CHESS_OPENING_BOOK = Object.freeze([
+  Object.freeze({ id: "italian", moves: Object.freeze(["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6", "d2d3", "f8c5"]) }),
+  Object.freeze({ id: "ruy-lopez", moves: Object.freeze(["e2e4", "e7e5", "g1f3", "b8c6", "f1b5", "a7a6", "b5a4", "g8f6"]) }),
+  Object.freeze({ id: "scotch", moves: Object.freeze(["e2e4", "e7e5", "g1f3", "b8c6", "d2d4", "e5d4", "f3d4", "g8f6"]) }),
+  Object.freeze({ id: "sicilian-open", moves: Object.freeze(["e2e4", "c7c5", "g1f3", "d7d6", "d2d4", "c5d4", "f3d4", "g8f6"]) }),
+  Object.freeze({ id: "sicilian-najdorf", moves: Object.freeze(["e2e4", "c7c5", "g1f3", "d7d6", "d2d4", "c5d4", "f3d4", "g8f6", "b1c3", "a7a6"]) }),
+  Object.freeze({ id: "queens-gambit", moves: Object.freeze(["d2d4", "d7d5", "c2c4", "e7e6", "b1c3", "g8f6", "c1g5", "f8e7"]) }),
+  Object.freeze({ id: "slav", moves: Object.freeze(["d2d4", "d7d5", "c2c4", "c7c6", "b1c3", "g8f6", "g1f3", "d5c4"]) }),
+  Object.freeze({ id: "queens-indian", moves: Object.freeze(["d2d4", "g8f6", "c2c4", "e7e6", "g1f3", "b7b6", "g2g3", "c8b7"]) }),
+  Object.freeze({ id: "kings-indian", moves: Object.freeze(["d2d4", "g8f6", "c2c4", "g7g6", "b1c3", "f8g7", "e2e4", "d7d6"]) }),
+  Object.freeze({ id: "english", moves: Object.freeze(["c2c4", "e7e5", "b1c3", "g8f6", "g2g3", "d7d5", "c4d5", "f6d5"]) }),
+  Object.freeze({ id: "french", moves: Object.freeze(["e2e4", "e7e6", "d2d4", "d7d5", "b1c3", "g8f6", "c1g5", "f8e7"]) }),
+  Object.freeze({ id: "caro-kann", moves: Object.freeze(["e2e4", "c7c6", "d2d4", "d7d5", "b1c3", "d5e4", "c3e4", "c8f5"]) }),
 ]);
+
+export const CHESS_AUDIT_DEPTHS = Object.freeze({
+  l6: 8,
+  l7: 10,
+  l8: 12,
+  l9: 14,
+  l10: 16,
+});
 
 function sameMove(left, right) {
   return left?.from?.[0] === right?.from?.[0]
@@ -111,31 +127,46 @@ function engineTimeFor(level, overrides) {
   return CHESS_ENGINE_TIMES_MS[normalized] ?? CHESS_ENGINE_TIMES_MS.l10;
 }
 
-async function chooseLevelMove({ state, level, repetitionCount, engine, engineTimes }) {
+function auditDepthFor(level, overrides) {
+  const normalized = normalizeLevel(level);
+  const override = overrides?.[normalized];
+  if (Number.isInteger(override) && override >= 1 && override <= 99) return override;
+  return CHESS_AUDIT_DEPTHS[normalized] ?? CHESS_AUDIT_DEPTHS.l10;
+}
+
+async function chooseLevelMove({ state, level, repetitionCount, engine, engineTimes, engineControl, engineDepths }) {
   if (levelNumber(level) <= 5) {
     return chooseClassicMove(state, levelNumber(level), { repetitionCount });
   }
+  const fixedDepth = engineControl === "fixed-depth";
   const uci = await engine.choose({
     game: "chess",
     fen: stateToFen(state),
     level: levelNumber(level),
     movetimeMs: engineTimeFor(level, engineTimes),
+    searchDepth: fixedDepth ? auditDepthFor(level, engineDepths) : undefined,
+    // The deterministic capability audit removes the stochastic weakening
+    // knob; production-parity games retain the shipped per-level Skill value.
+    engineSkill: fixedDepth ? 20 : undefined,
   });
   return uciToMove(uci);
 }
 
 export function buildOpeningSchedule(options = {}) {
   const gamesPerPair = Number.isInteger(options.gamesPerPair) ? options.gamesPerPair : 1;
-  if (gamesPerPair < 1 || gamesPerPair > 10_000) throw new Error("gamesPerPair must be an integer from 1 to 10000");
+  if (gamesPerPair < 1 || gamesPerPair > CHESS_OPENING_BOOK.length) {
+    throw new Error(`gamesPerPair must be an integer from 1 to ${CHESS_OPENING_BOOK.length} without repeating openings`);
+  }
   const offset = Number.isInteger(options.openingOffset) ? options.openingOffset : 0;
-  return Array.from({ length: gamesPerPair }, (_, index) => OPENING_BOOK[(offset + index) % OPENING_BOOK.length]);
+  const start = ((offset % CHESS_OPENING_BOOK.length) + CHESS_OPENING_BOOK.length) % CHESS_OPENING_BOOK.length;
+  return Array.from({ length: gamesPerPair }, (_, index) => CHESS_OPENING_BOOK[(start + index) % CHESS_OPENING_BOOK.length]);
 }
 
 export async function playGame(options = {}) {
   const white = normalizeLevel(options.white ?? "l5");
   const black = normalizeLevel(options.black ?? "l6");
   const maxPlies = Number.isInteger(options.maxPlies) ? options.maxPlies : 160;
-  const opening = options.opening ?? OPENING_BOOK[0].moves;
+  const opening = options.opening ?? CHESS_OPENING_BOOK[0].moves;
   let state = createInitialState();
   const repetition = createRepetitionTracker();
   repetition.reset(state);
@@ -175,6 +206,8 @@ export async function playGame(options = {}) {
         repetitionCount: repetition.countCurrent(),
         engine,
         engineTimes: options.engineTimes,
+        engineControl: options.engineControl,
+        engineDepths: options.engineDepths,
       });
       if (!move) throw new Error(`${level} returned no move for an ongoing position`);
       const next = applyMove(state, move);
@@ -206,20 +239,24 @@ export async function runTournament(options = {}) {
   const plans = planPairedGames(levels, openings);
   const games = [];
   const engine = new FairyStockfishNode();
+  const engineControl = options.engineControl === "fixed-depth" ? "fixed-depth" : "production-parity";
   try {
     for (const plan of plans) {
+      await engine.resetGame();
       games.push(await playGame({
         ...plan,
         engine,
         maxPlies: options.maxPlies,
         engineTimes: options.engineTimes,
+        engineControl,
+        engineDepths: options.engineDepths,
       }));
     }
   } finally {
     await engine.close();
   }
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     engine: { l5: "classic-search", l6to10: "fairy-stockfish-nnue-1.1.11" },
     config: {
       levels,
@@ -227,6 +264,11 @@ export async function runTournament(options = {}) {
       pairedColors: true,
       sharedOpeningSchedule: true,
       maxPlies: options.maxPlies ?? 160,
+      engineControl,
+      engineDepths: engineControl === "fixed-depth"
+        ? Object.fromEntries(levels.filter((level) => levelNumber(level) > 5)
+          .map((level) => [level, auditDepthFor(level, options.engineDepths)]))
+        : null,
       engineTimes: Object.fromEntries(levels.filter((level) => levelNumber(level) > 5)
         .map((level) => [level, engineTimeFor(level, options.engineTimes)])),
     },

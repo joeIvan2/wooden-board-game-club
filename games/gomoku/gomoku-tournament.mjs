@@ -68,6 +68,39 @@ function addResult(record, result, level) {
   }
 }
 
+// Resource profiles only prove a level is stronger when they actually reach
+// deeper completed iterations on representative positions. Keep that evidence
+// in every headless result without changing the shipped V4 search algorithm.
+function summarizeSearchDiagnostics(levels, games) {
+  const totals = new Map(levels.map((level) => [level, {
+    level,
+    searches: 0,
+    nodes: 0,
+    timedOut: 0,
+    totalDepth: 0,
+    minDepth: null,
+    maxDepth: 0,
+  }]));
+  for (const game of games) {
+    for (const move of game.moves ?? []) {
+      if (move.opening || !move.level || !move.search) continue;
+      const entry = totals.get(move.level);
+      if (!entry) continue;
+      const depth = Number(move.search.depth) || 0;
+      entry.searches += 1;
+      entry.nodes += Number(move.search.nodes) || 0;
+      entry.totalDepth += depth;
+      entry.minDepth = entry.minDepth === null ? depth : Math.min(entry.minDepth, depth);
+      entry.maxDepth = Math.max(entry.maxDepth, depth);
+      if (move.search.timedOut) entry.timedOut += 1;
+    }
+  }
+  return Object.fromEntries([...totals.entries()].map(([level, entry]) => [level, {
+    ...entry,
+    averageDepth: entry.searches ? entry.totalDepth / entry.searches : null,
+  }]));
+}
+
 function summarizePair(left, right, games) {
   const leftRecord = blankRecord(left);
   const rightRecord = blankRecord(right);
@@ -209,9 +242,10 @@ export function runTournament(options = {}) {
     .map((record) => ({ ...record, games: record.wins + record.draws + record.losses }))
     .sort((left, right) => right.points - left.points || levelNumber(right.level) - levelNumber(left.level));
   const verification = verifyExpectedOrder(levels, headToHead);
+  const searchDiagnostics = summarizeSearchDiagnostics(levels, allGames);
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     engine: { version: AI_ENGINE_VERSION, deterministic: true, mode: 'fixed-profile' },
     config: {
       levels,
@@ -225,8 +259,8 @@ export function runTournament(options = {}) {
     headToHead,
     ranking,
     verification,
+    searchDiagnostics,
   };
 }
 
 export default { buildOpeningSchedule, planTournamentGames, wilsonLowerBound, verifyExpectedOrder, runTournament };
-

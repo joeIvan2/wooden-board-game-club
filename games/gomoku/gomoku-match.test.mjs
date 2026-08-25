@@ -55,6 +55,8 @@ check('three-level paired round robin has no invalid games and correct rank', ()
   assert(result.games.every((game) => !game.invalid));
   assert.deepEqual(result.ranking.map((entry) => entry.level), ['l3', 'l2', 'l1']);
   assert.equal(result.verification.passed, true);
+  assert(result.searchDiagnostics.l3.searches > 0);
+  assert(Number.isFinite(result.searchDiagnostics.l3.averageDepth));
 });
 
 check('opening schedule is deterministic, shared by every pair, and color-paired', () => {
@@ -142,4 +144,3 @@ check('tournament-context games repeat move-for-move under fixed node budgets', 
 });
 
 console.log(`\n${passed} match/tournament checks passed`);
-

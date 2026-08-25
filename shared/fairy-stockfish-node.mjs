@@ -1,5 +1,5 @@
 /**
- * Node-only Fairy-Stockfish adapter for reproducible engine matches.
+ * Node-only Fairy-Stockfish adapter for isolated engine matches.
  *
  * The shipped browser worker owns the interactive protocol.  This adapter uses
  * the exact same pinned Fairy-Stockfish WASM bundle, but exposes a small async
@@ -27,6 +27,21 @@ let cjsWorkerPath = null;
 function skillFor(level) {
   const index = Math.max(1, Math.min(10, Math.trunc(Number(level) || 1))) - 1;
   return SKILL_LEVELS[index];
+}
+
+function normalizeEngineSkill(value, fallbackLevel) {
+  if (Number.isFinite(value)) return Math.max(0, Math.min(20, Math.floor(value)));
+  return skillFor(fallbackLevel);
+}
+
+function normalizeSearchDepth(value) {
+  if (!Number.isInteger(value) || value < 1 || value > 99) return null;
+  return value;
+}
+
+function normalizeNodeBudget(value) {
+  if (!Number.isInteger(value) || value < 1) return null;
+  return value;
 }
 
 function loadFactory() {
@@ -110,20 +125,39 @@ export class FairyStockfishNode {
     }
   }
 
-  async choose({ game, fen, level, movetimeMs }) {
+  async resetGame() {
+    if (!this.#engine) return;
+    if (this.#moveWaiter || this.#commandWaiter) throw new Error("Fairy-Stockfish cannot reset while a command is active");
+    this.#send("ucinewgame");
+    this.#send("setoption name Clear Hash");
+    await this.#commandUntil("isready", (line) => line === "readyok");
+  }
+
+  async choose({ game, fen, level, movetimeMs, searchDepth, nodeBudget, engineSkill }) {
     await this.start(game);
     if (typeof fen !== "string" || !fen.trim()) throw new Error("Engine match needs a FEN position");
     if (this.#moveWaiter || this.#commandWaiter) throw new Error("Fairy-Stockfish command overlap");
     const movetime = Math.max(50, Math.floor(Number(movetimeMs) || 1000));
-    this.#send(`setoption name Skill Level value ${skillFor(level)}`);
+    const depth = normalizeSearchDepth(searchDepth);
+    const nodes = depth ? null : normalizeNodeBudget(nodeBudget);
+    const skill = normalizeEngineSkill(engineSkill, level);
+    this.#send(`setoption name Skill Level value ${skill}`);
     await this.#commandUntil("isready", (line) => line === "readyok");
+
+    // `go depth` and `go nodes` make an audit independent of host scheduling.
+    // Product-parity matches deliberately retain movetime because that is what
+    // the browser board ships to players.
+    const searchCommand = depth ? `go depth ${depth}` : nodes ? `go nodes ${nodes}` : `go movetime ${movetime}`;
+    const timeoutMs = depth || nodes
+      ? Math.max(30_000, Math.ceil((nodes ?? depth * 50_000) / 10_000) * 1_000)
+      : movetime + 15_000;
 
     const move = new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         if (this.#moveWaiter?.timer !== timer) return;
         this.#moveWaiter = null;
-        reject(new Error(`Fairy-Stockfish did not return a move within ${movetime + 15_000}ms`));
-      }, movetime + 15_000);
+        reject(new Error(`Fairy-Stockfish did not return a move within ${timeoutMs}ms`));
+      }, timeoutMs);
       this.#moveWaiter = {
         timer,
         resolve: (bestmove) => {
@@ -137,7 +171,7 @@ export class FairyStockfishNode {
       };
     });
     this.#send(`position fen ${fen}`);
-    this.#send(`go movetime ${movetime}`);
+    this.#send(searchCommand);
     return move.finally(() => {
       this.#moveWaiter = null;
     });
@@ -205,4 +239,4 @@ export class FairyStockfishNode {
   }
 }
 
-export { skillFor };
+export { skillFor, normalizeEngineSkill };

@@ -91,9 +91,10 @@ function thinkTimeMs(solveLevel) {
   if (solveLevel <= 3) return 750;
   if (solveLevel <= 4) return 1100;
   if (solveLevel <= 5) return 1500;
-  if (solveLevel >= 10) return 6000;
-  if (solveLevel >= 9) return 4500;
-  if (solveLevel >= 7) return 3200;
+  if (solveLevel >= 10) return 8200;
+  if (solveLevel >= 9) return 6200;
+  if (solveLevel >= 8) return 4600;
+  if (solveLevel >= 7) return 3400;
   return BASE_AI_THINK_MS;
 }
 

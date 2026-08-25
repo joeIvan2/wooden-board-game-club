@@ -31,3 +31,18 @@ test("Node tournament adapter returns a legal-looking Xiangqi UCI move", async (
     await engine.close();
   }
 });
+
+test("Node adapter resets an engine game and accepts a fixed-depth audit search", async () => {
+  const engine = new FairyStockfishNode();
+  try {
+    const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    const first = await engine.choose({ game: "chess", fen, level: 6, searchDepth: 3, engineSkill: 20 });
+    await engine.resetGame();
+    const second = await engine.choose({ game: "chess", fen, level: 6, searchDepth: 3, engineSkill: 20 });
+    assert.match(first, /^[a-h][1-8][a-h][1-8][qrbn]?$/i);
+    assert.match(second, /^[a-h][1-8][a-h][1-8][qrbn]?$/i);
+    assert.equal(second, first, "fixed depth with maximum skill must replay after a reset");
+  } finally {
+    await engine.close();
+  }
+});

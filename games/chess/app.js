@@ -56,7 +56,7 @@ let leaderboard = null;
 const sqButtons = [];
 
 function engineThinkTimeMs(solveLevel) {
-  const budgets = [250, 350, 500, 700, 950, 1300, 1800, 2600, 3800, 5600];
+  const budgets = [250, 350, 500, 700, 950, 1500, 2300, 3400, 5000, 7200];
   const index = Math.max(1, Math.min(10, Math.trunc(Number(solveLevel) || 1))) - 1;
   return budgets[index];
 }
