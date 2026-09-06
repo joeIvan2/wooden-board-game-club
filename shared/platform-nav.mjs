@@ -1,6 +1,10 @@
 import { GAME_REGISTRY } from "./game-registry.mjs";
 
 const baseUrl = new URL("../", import.meta.url);
+const COMPANION_GAMES = Object.freeze([
+  { name: "Assemble Human", href: "https://assemble-human.pages.dev/" },
+  { name: "Abyssal Hunt", href: "https://abyssal-hunt.pages.dev/" },
+]);
 
 class PlatformNav extends HTMLElement {
   connectedCallback() {
@@ -9,6 +13,9 @@ class PlatformNav extends HTMLElement {
       const active = current === game.id;
       return `<a class="platform-game-link${active ? " is-active" : ""}" href="${new URL(game.route, baseUrl).href}"${active ? ' aria-current="page"' : ""}>${game.name}</a>`;
     }).join("");
+    const companionLinks = COMPANION_GAMES.map(
+      (game) => `<a class="platform-external-link" href="${game.href}" target="_blank" rel="noopener noreferrer" aria-label="前往 ${game.name}（另開新分頁）"><span>${game.name}</span><span aria-hidden="true">↗</span></a>`,
+    ).join("");
     const homeActive = current === "home";
     this.innerHTML = `
       <nav class="platform-nav" aria-label="原木棋社主導覽">
@@ -20,6 +27,7 @@ class PlatformNav extends HTMLElement {
           <span><strong>原木棋社</strong><small>WOODGRAIN BOARD CLUB</small></span>
         </a>
         <div class="platform-game-links" aria-label="切換遊戲">${gameLinks}</div>
+        <div class="platform-external-links" aria-label="其他遊戲">${companionLinks}</div>
         <span class="platform-mode"><i aria-hidden="true"></i>本機對局</span>
       </nav>`;
   }

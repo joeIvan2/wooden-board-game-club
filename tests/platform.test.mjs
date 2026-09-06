@@ -31,6 +31,9 @@ await check("首頁與三個遊戲頁共用平台導覽", async () => {
   const nav = await read("shared/platform-nav.mjs");
   assert.match(nav, /aria-current="page"/);
   assert.match(nav, /本機對局/);
+  assert.match(nav, /https:\/\/assemble-human\.pages\.dev\//);
+  assert.match(nav, /https:\/\/abyssal-hunt\.pages\.dev\//);
+  assert.match(nav, /target="_blank" rel="noopener noreferrer"/);
 });
 
 await check("五子棋已完全改為 2D 且保留 15×15 無障礙棋盤", async () => {
